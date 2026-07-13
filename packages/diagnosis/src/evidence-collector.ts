@@ -1,4 +1,4 @@
-import type { CollectedEvidence, RunbookEntry } from '@aapsd/contracts';
+import type { CollectedEvidence } from '@aapsd/contracts';
 
 export async function collectGitHubEvidence(_pipelineRunId?: string): Promise<CollectedEvidence> {
   return {
@@ -38,13 +38,4 @@ export async function collectAllEvidence(
     collectPrometheusEvidence(timeRange),
   ]);
   return results;
-}
-
-export async function retrieveRunbook(_query: string): Promise<RunbookEntry | null> {
-  return {
-    id: 'stub-runbook',
-    title: 'Staging Deployment Troubleshooting',
-    content: 'Check the pipeline logs and pod status for common failure patterns.',
-    tags: ['staging', 'deployment', 'troubleshooting'],
-  };
 }

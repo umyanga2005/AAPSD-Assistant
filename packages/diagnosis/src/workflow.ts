@@ -1,7 +1,8 @@
 import type { DiagnosisRequest, DiagnosisResult } from '@aapsd/contracts';
 import type { ModelProvider } from './model-provider/types.js';
 import { authorizeRequest } from './authorizer.js';
-import { collectAllEvidence, retrieveRunbook } from './evidence-collector.js';
+import { collectAllEvidence } from './evidence-collector.js';
+import { retrieveRunbook } from './runbook-service.js';
 import { redactEvidence } from './redactor.js';
 import { analyzeWithModel } from './analyzer.js';
 

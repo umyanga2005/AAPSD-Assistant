@@ -7,7 +7,7 @@ export {
   collectGitHubEvidence,
   collectKubernetesEvidence,
   collectPrometheusEvidence,
-  retrieveRunbook,
 } from './evidence-collector.js';
+export { retrieveRunbook } from './runbook-service.js';
 export type { ModelProvider } from './model-provider/types.js';
 export { FakeModelProvider, OpenRouterModelProvider } from './model-provider/index.js';
