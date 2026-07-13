@@ -1,4 +1,13 @@
-import { pgTable, uuid, varchar, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+  jsonb,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const users = pgTable(
   'users',
@@ -53,6 +62,30 @@ export const environments = pgTable(
   (table) => ({
     envProjectIdx: index('idx_environments_project_id').on(table.projectId),
     envNameProjectUniq: index('idx_environments_name_project').on(table.name, table.projectId),
+  }),
+);
+
+export const projectMembers = pgTable(
+  'project_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 50 }).notNull().default('viewer'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    pmProjectIdx: index('idx_pm_project_id').on(table.projectId),
+    pmUserIdx: index('idx_pm_user_id').on(table.userId),
+    pmUnique: uniqueIndex('idx_pm_project_user').on(table.projectId, table.userId),
   }),
 );
 

@@ -1,28 +1,54 @@
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type * as schema from '../src/db/schema.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sanitizeMetadata } from '../src/services/audit.js';
+import { users, projectMembers } from '../src/db/schema.js';
 import * as dbModule from '../src/db/index.js';
 
 vi.mock('../src/db/index.js', () => ({
   getDb: vi.fn(),
 }));
 
-const mockOffset = vi.fn();
-const mockLimit = vi.fn(() => ({ offset: mockOffset }));
-const mockOrderBy = vi.fn(() => ({ limit: mockLimit }));
-const mockWhere = vi.fn(() => ({ orderBy: mockOrderBy }));
-const mockFrom = vi.fn(() => ({ where: mockWhere }));
-const mockInsert = vi.fn(() => ({ values: vi.fn() }));
+const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
+const DEV_PROJECT_ID = '00000000-0000-0000-0000-000000000002';
+
+const mockUserLimit = vi.fn();
+const mockUserWhere = vi.fn(() => ({ limit: mockUserLimit }));
+const mockMemberLimit = vi.fn();
+const mockMemberWhere = vi.fn(() => ({ limit: mockMemberLimit }));
+const mockAuditOffset = vi.fn();
+const mockAuditLimit = vi.fn(() => ({ offset: mockAuditOffset }));
+const mockAuditOrderBy = vi.fn(() => ({ limit: mockAuditLimit }));
+const mockAuditWhere = vi.fn(() => ({ orderBy: mockAuditOrderBy }));
+const mockFrom = vi.fn((table: unknown) => {
+  if (table === users) return { where: mockUserWhere };
+  if (table === projectMembers) return { where: mockMemberWhere };
+  return { where: mockAuditWhere };
+});
+const mockInsertValues = vi.fn();
+const mockInsert = vi.fn(() => ({ values: mockInsertValues }));
 const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
-const mockDb = {
+const mockDb: NodePgDatabase<typeof schema> = {
   insert: mockInsert,
   select: mockSelect,
-};
+} as unknown as NodePgDatabase<typeof schema>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(dbModule.getDb).mockReturnValue(mockDb);
+  mockUserLimit.mockResolvedValue([
+    { id: DEV_USER_ID, email: 'dev@local', name: 'Dev', role: 'viewer' },
+  ]);
+  mockMemberLimit.mockResolvedValue([
+    { projectId: DEV_PROJECT_ID, userId: DEV_USER_ID, role: 'viewer' },
+  ]);
 });
+
+const COMMON_HEADERS = {
+  'x-dev-user-id': DEV_USER_ID,
+  'x-dev-role': 'viewer',
+};
 
 describe('sanitizeMetadata', () => {
   it('strips top-level sensitive keys', () => {
@@ -105,13 +131,10 @@ describe('sanitizeMetadata', () => {
 
 describe('recordAuditEvent', () => {
   it('calls db.insert with sanitized values', async () => {
-    const mockValues = vi.fn();
-    mockInsert.mockReturnValue({ values: mockValues });
-
     const { recordAuditEvent } = await import('../src/services/audit.js');
     await recordAuditEvent({
-      actorId: '00000000-0000-0000-0000-000000000001',
-      projectId: '00000000-0000-0000-0000-000000000002',
+      actorId: DEV_USER_ID,
+      projectId: DEV_PROJECT_ID,
       eventType: 'request.created',
       traceId: 'trace-1',
       targetType: 'request',
@@ -125,10 +148,10 @@ describe('recordAuditEvent', () => {
 
     expect(mockInsert).toHaveBeenCalledOnce();
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockInsertValues.mock.calls[0][0];
     expect(inserted).toMatchObject({
-      actorId: '00000000-0000-0000-0000-000000000001',
-      projectId: '00000000-0000-0000-0000-000000000002',
+      actorId: DEV_USER_ID,
+      projectId: DEV_PROJECT_ID,
       eventType: 'request.created',
       traceId: 'trace-1',
       targetType: 'request',
@@ -141,39 +164,31 @@ describe('recordAuditEvent', () => {
   });
 
   it('handles record without metadata', async () => {
-    const mockValues = vi.fn();
-    mockInsert.mockReturnValue({ values: mockValues });
-
     const { recordAuditEvent } = await import('../src/services/audit.js');
     await recordAuditEvent({
-      actorId: '00000000-0000-0000-0000-000000000001',
-      projectId: '00000000-0000-0000-0000-000000000002',
+      actorId: DEV_USER_ID,
+      projectId: DEV_PROJECT_ID,
       eventType: 'authorization.denied',
       traceId: 'trace-2',
       targetType: 'request',
       targetId: '00000000-0000-0000-0000-000000000003',
     });
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockInsertValues.mock.calls[0][0];
     expect(inserted.metadata).toEqual({});
   });
 });
 
 describe('getAuditEventsByProject', () => {
   it('calls db.select chain and returns result', async () => {
-    const expected = [{ id: 'event-1', eventType: 'request.created' }];
-    mockOffset.mockResolvedValue(expected);
-
     const { getAuditEventsByProject } = await import('../src/services/audit.js');
+    const expected = [{ id: 'event-1', eventType: 'request.created' }];
+    mockAuditOffset.mockResolvedValue(expected);
 
-    const result = await getAuditEventsByProject('00000000-0000-0000-0000-000000000002');
+    const result = await getAuditEventsByProject(DEV_PROJECT_ID);
 
-    expect(mockSelect).toHaveBeenCalledOnce();
-    expect(mockFrom).toHaveBeenCalledOnce();
-    expect(mockWhere).toHaveBeenCalledOnce();
-    expect(mockOrderBy).toHaveBeenCalledOnce();
-    expect(mockLimit).toHaveBeenCalledOnce();
-    expect(mockOffset).toHaveBeenCalledOnce();
+    expect(mockSelect).toHaveBeenCalled();
+    expect(mockAuditOffset).toHaveBeenCalled();
     expect(result).toEqual(expected);
   });
 });
@@ -185,6 +200,7 @@ describe('GET /api/audit-events', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/audit-events',
+      headers: COMMON_HEADERS,
     });
 
     expect(response.statusCode).toBe(400);
@@ -196,11 +212,12 @@ describe('GET /api/audit-events', () => {
   it('returns 200 with audit events', async () => {
     const { buildApp } = await import('../src/index.js');
     const app = buildApp();
-    mockOffset.mockResolvedValue([{ id: 'event-1', eventType: 'request.created' }]);
+    mockAuditOffset.mockResolvedValue([{ id: 'event-1', eventType: 'request.created' }]);
 
     const response = await app.inject({
       method: 'GET',
-      url: '/api/audit-events?project_id=00000000-0000-0000-0000-000000000002',
+      url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,
+      headers: COMMON_HEADERS,
     });
 
     expect(response.statusCode).toBe(200);

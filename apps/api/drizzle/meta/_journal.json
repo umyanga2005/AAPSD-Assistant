@@ -15,6 +15,13 @@
       "when": 1783926502267,
       "tag": "0001_outstanding_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783932366217,
+      "tag": "0002_safe_ghost_rider",
+      "breakpoints": true
     }
   ]
 }
