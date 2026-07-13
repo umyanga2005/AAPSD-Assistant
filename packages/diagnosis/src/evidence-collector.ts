@@ -1,6 +1,7 @@
 import type { CollectedEvidence } from '@aapsd/contracts';
 import { getGitHubAdapter } from './github-adapter/index.js';
 import { getK8sAdapter } from './k8s-adapter/index.js';
+import { getPrometheusAdapter } from './prometheus-adapter/index.js';
 
 export async function collectGitHubEvidence(pipelineRunId?: string): Promise<CollectedEvidence> {
   const adapter = getGitHubAdapter();
@@ -28,14 +29,19 @@ export async function collectKubernetesEvidence(podName?: string): Promise<Colle
   };
 }
 
-export async function collectPrometheusEvidence(_timeRange?: {
+export async function collectPrometheusEvidence(timeRange?: {
   start: string;
   end: string;
 }): Promise<CollectedEvidence> {
+  const adapter = getPrometheusAdapter();
+  if (adapter) {
+    return adapter.collectEvidence(timeRange);
+  }
+
   return {
     source: 'prometheus',
     logs: ['[stub] Prometheus metrics not yet connected'],
-    metadata: { timeRange: _timeRange ?? null },
+    metadata: { timeRange: timeRange ?? null },
   };
 }
 

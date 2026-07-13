@@ -23,6 +23,10 @@ import {
   RealK8sAdapter,
   MockK8sAdapter,
   setK8sAdapter,
+  RealPrometheusAdapter,
+  MockPrometheusAdapter,
+  setPrometheusAdapter,
+  ALL_METRICS,
   type ModelProvider,
 } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
@@ -60,6 +64,19 @@ export function buildApp(): FastifyInstance {
       setK8sAdapter(k8sAdapter);
     } else {
       setK8sAdapter(new MockK8sAdapter());
+    }
+
+    if (config.prometheusBaseUrl) {
+      const promAdapter = new RealPrometheusAdapter({
+        baseUrl: config.prometheusBaseUrl,
+        allowedMetrics:
+          config.prometheusAllowedMetrics.length > 0
+            ? config.prometheusAllowedMetrics
+            : ALL_METRICS,
+      });
+      setPrometheusAdapter(promAdapter);
+    } else {
+      setPrometheusAdapter(new MockPrometheusAdapter());
     }
   }
 

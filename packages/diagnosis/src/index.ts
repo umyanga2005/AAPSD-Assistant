@@ -33,3 +33,18 @@ export {
   K8sApiError,
 } from './k8s-adapter/index.js';
 export type { K8sAdapter, K8sConfig, Pod, Event, Deployment } from './k8s-adapter/index.js';
+export {
+  setPrometheusAdapter,
+  getPrometheusAdapter,
+  MockPrometheusAdapter,
+  RealPrometheusAdapter,
+  PrometheusApiError,
+  TimeoutError,
+} from './prometheus-adapter/index.js';
+export type {
+  PrometheusAdapter,
+  PrometheusConfig,
+  MetricName,
+  MetricResult,
+} from './prometheus-adapter/index.js';
+export { ALL_METRICS } from './prometheus-adapter/index.js';

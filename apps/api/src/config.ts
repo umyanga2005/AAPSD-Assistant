@@ -9,6 +9,8 @@ export interface AppConfig {
   k8sToken?: string;
   k8sApiServerUrl?: string;
   k8sAllowedNamespaces: string[];
+  prometheusBaseUrl?: string;
+  prometheusAllowedMetrics: string[];
 }
 
 export class ConfigError extends Error {
@@ -72,6 +74,15 @@ export function getConfig(): AppConfig {
         .filter(Boolean)
     : [];
 
+  const prometheusBaseUrl = process.env.PROMETHEUS_BASE_URL || undefined;
+  const allowedMetricsRaw = process.env.PROMETHEUS_ALLOWED_METRICS || '';
+  const prometheusAllowedMetrics = allowedMetricsRaw
+    ? allowedMetricsRaw
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean)
+    : [];
+
   if (errors.length > 0) {
     throw new ConfigError(errors);
   }
@@ -87,6 +98,8 @@ export function getConfig(): AppConfig {
     k8sToken,
     k8sApiServerUrl,
     k8sAllowedNamespaces,
+    prometheusBaseUrl,
+    prometheusAllowedMetrics,
   };
 }
 
