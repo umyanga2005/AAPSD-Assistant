@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
 import { getConfig, ConfigError } from './config.js';
 import { testConnection } from './db/index.js';
+import { getAuditEventsByProject } from './services/audit.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -38,6 +39,27 @@ export function buildApp(): FastifyInstance {
       database,
       uptime: process.uptime(),
     };
+  });
+
+  app.get<{ Querystring: { project_id?: string } }>('/api/audit-events', async (request, reply) => {
+    const { project_id } = request.query;
+    if (!project_id) {
+      return reply.status(400).send({
+        error: 'Query parameter project_id is required',
+        statusCode: 400,
+      });
+    }
+
+    try {
+      const events = await getAuditEventsByProject(project_id);
+      return { data: events };
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        statusCode: 500,
+      });
+    }
   });
 
   return app;

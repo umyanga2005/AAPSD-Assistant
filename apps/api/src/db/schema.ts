@@ -94,6 +94,9 @@ export const auditEvents = pgTable(
     actorId: uuid('actor_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     eventType: varchar('event_type', { length: 100 }).notNull(),
     traceId: varchar('trace_id', { length: 64 }).notNull(),
     targetType: varchar('target_type', { length: 100 }).notNull(),
@@ -103,6 +106,7 @@ export const auditEvents = pgTable(
   },
   (table) => ({
     auditActorIdx: index('idx_audit_actor_id').on(table.actorId),
+    auditProjectIdx: index('idx_audit_project_id').on(table.projectId),
     auditEventTypeIdx: index('idx_audit_event_type').on(table.eventType),
     auditTraceIdx: index('idx_audit_trace_id').on(table.traceId),
     auditTargetIdx: index('idx_audit_target').on(table.targetType, table.targetId),
