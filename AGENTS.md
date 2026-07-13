@@ -7,4 +7,9 @@ For every task:
 3. Do one small task only
 4. Run tests/lint/type-check after implementation
 5. Review the changed files yourself
-6. Commit the completed task before moving on
+6. Commit the completed task before moving on using this git workflow:
+```
+git status
+git add .
+git commit -m "feat: add application foundation"
+```
