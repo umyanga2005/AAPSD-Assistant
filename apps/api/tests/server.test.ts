@@ -25,7 +25,7 @@ describe('API', () => {
   });
 
   describe('GET /ready', () => {
-    it('returns 200 with status and uptime', async () => {
+    it('returns 200 with database status and uptime', async () => {
       const response = await app.inject({
         method: 'GET',
         url: '/ready',
@@ -33,7 +33,8 @@ describe('API', () => {
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('status', 'ok');
+      expect(body).toHaveProperty('status');
+      expect(body).toHaveProperty('database');
       expect(body).toHaveProperty('uptime');
       expect(typeof body.uptime).toBe('number');
     });

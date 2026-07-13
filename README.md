@@ -58,6 +58,27 @@ Copy the example file to get started:
 cp apps/api/.env.example apps/api/.env
 ```
 
+### Database Migrations
+
+This project uses [Drizzle ORM](https://orm.drizzle.team) with PostgreSQL.
+
+```bash
+# Generate a new migration after schema changes
+cd apps/api && npm run db:generate
+
+# Apply pending migrations
+cd apps/api && npm run db:migrate
+
+# Open Drizzle Studio (GUI data browser)
+cd apps/api && npm run db:studio
+```
+
+Migrations run against the database configured in `DATABASE_URL`. Ensure PostgreSQL is running first:
+
+```bash
+docker compose -f infra/docker/compose.yaml --env-file infra/docker/.env up -d
+```
+
 ## Frontend
 
 ```bash

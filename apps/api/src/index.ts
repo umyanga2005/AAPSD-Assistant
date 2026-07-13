@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
 import { getConfig, ConfigError } from './config.js';
+import { testConnection } from './db/index.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -25,8 +26,16 @@ export function buildApp(): FastifyInstance {
   });
 
   app.get('/ready', async () => {
+    let database: 'up' | 'down' = 'down';
+    try {
+      database = (await testConnection()) ? 'up' : 'down';
+    } catch {
+      database = 'down';
+    }
+
     return {
-      status: 'ok',
+      status: database === 'up' ? 'ok' : 'degraded',
+      database,
       uptime: process.uptime(),
     };
   });
