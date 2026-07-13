@@ -1,15 +1,19 @@
 import type { DiagnosisRequest, DiagnosisResult } from '@aapsd/contracts';
 import type { ModelProvider } from './model-provider/types.js';
+import type { EvidenceCollector, EvidenceCollectorOptions } from './evidence-collector-types.js';
 import { authorizeRequest } from './authorizer.js';
-import { collectAllEvidence } from './evidence-collector.js';
+import { createDefaultEvidenceCollector } from './evidence-collector.js';
 import { retrieveRunbook } from './runbook-service.js';
 import { redactEvidence } from './redactor.js';
 import { analyzeWithModel } from './analyzer.js';
+
+export type { EvidenceCollector, EvidenceCollectorOptions } from './evidence-collector-types.js';
 
 export async function runDiagnosis(
   request: DiagnosisRequest,
   userRoles: string[],
   provider?: ModelProvider,
+  evidenceCollector?: EvidenceCollector,
 ): Promise<DiagnosisResult> {
   const auth = authorizeRequest(request, userRoles);
   if (!auth.authorized) {
@@ -26,13 +30,66 @@ export async function runDiagnosis(
     };
   }
 
-  const evidenceList = await collectAllEvidence(
-    request.context?.pipelineRunId,
-    request.context?.podName,
-    request.context?.timeRange,
+  const context = request.context;
+  const hasAnyContext = !!(context?.pipelineRunId || context?.podName || context?.timeRange);
+
+  if (!hasAnyContext) {
+    return {
+      requestId: request.traceId,
+      summary:
+        'No context provided. To run a diagnosis, specify a pipeline run, pod name, or time range.',
+      evidence: [],
+      likely_causes: [],
+      recommendations: [
+        {
+          action: 'Provide diagnostic context',
+          details:
+            'Include pipeline_run_id, pod_name, or a time range to collect relevant evidence.',
+        },
+      ],
+      confidence: 'insufficient_evidence',
+      needs_human_review: false,
+      redacted: false,
+      traceId: request.traceId,
+    };
+  }
+
+  const collector = evidenceCollector ?? createDefaultEvidenceCollector();
+
+  const collectOptions: EvidenceCollectorOptions = {
+    pipelineRunId: context?.pipelineRunId,
+    podName: context?.podName,
+    timeRange: context?.timeRange,
+  };
+
+  const [evidenceList, runbook] = await Promise.all([
+    collector.collectAll(collectOptions),
+    retrieveRunbook(request.query),
+  ]);
+
+  const hasUsableEvidence = evidenceList.some(
+    (e) => e.logs.length > 0 || Object.keys(e.metadata).length > 0,
   );
 
-  const runbook = await retrieveRunbook(request.query);
+  if (!hasUsableEvidence) {
+    return {
+      requestId: request.traceId,
+      summary: 'No usable evidence could be collected from the provided context.',
+      evidence: [],
+      likely_causes: [],
+      recommendations: [
+        {
+          action: 'Verify context values',
+          details:
+            'The provided pipeline run, pod name, or time range returned no data. Double-check values and try again.',
+        },
+      ],
+      confidence: 'insufficient_evidence',
+      needs_human_review: false,
+      redacted: false,
+      traceId: request.traceId,
+    };
+  }
 
   const redactedEvidence = evidenceList.map((e) => ({
     ...e,

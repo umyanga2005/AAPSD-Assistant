@@ -45,8 +45,8 @@ describe('AssistantScreen', () => {
 
   it('renders the read-only badge and form', () => {
     render(<AssistantScreen />);
-    expect(screen.getByText('Read-Only Analysis')).toBeInTheDocument();
-    expect(screen.getByText('Diagnosis Assistant')).toBeInTheDocument();
+    expect(screen.getByText('Read-Only AI')).toBeInTheDocument();
+    expect(screen.getByText('Smart Diagnosis')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/why did the latest/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /analyze/i })).toBeInTheDocument();
   });
@@ -67,7 +67,7 @@ describe('AssistantScreen', () => {
     typeInto(textarea, 'Why did the build fail?');
     fireEvent.click(screen.getByRole('button', { name: /analyze/i }));
 
-    expect(await screen.findByText(/running diagnosis/i)).toBeInTheDocument();
+    expect(await screen.findByText(/running smart diagnosis/i)).toBeInTheDocument();
   });
 
   it('shows diagnosis result on success', async () => {
@@ -87,7 +87,7 @@ describe('AssistantScreen', () => {
     expect(await screen.findByText(MOCK_RESULT.evidence[0].title)).toBeInTheDocument();
     expect(await screen.findByText(MOCK_RESULT.likely_causes[0].description)).toBeInTheDocument();
     expect(await screen.findByText(MOCK_RESULT.recommendations[0].action)).toBeInTheDocument();
-    expect(await screen.findByText('New Query')).toBeInTheDocument();
+    expect(await screen.findByText(/Start New Diagnosis/i)).toBeInTheDocument();
   });
 
   it('shows error message on API failure', async () => {
@@ -102,9 +102,9 @@ describe('AssistantScreen', () => {
     typeInto(screen.getByPlaceholderText(/why did the latest/i), 'Why did it fail?');
     fireEvent.click(screen.getByRole('button', { name: /analyze/i }));
 
-    expect(await screen.findByText('Diagnosis failed')).toBeInTheDocument();
+    expect(await screen.findByText('Diagnosis Failed')).toBeInTheDocument();
     expect(await screen.findByText('Validation failed')).toBeInTheDocument();
-    expect(await screen.findByText('Retry')).toBeInTheDocument();
+    expect(await screen.findByText('Try Again')).toBeInTheDocument();
   });
 
   it('retry button re-submits on failure', async () => {
@@ -128,7 +128,7 @@ describe('AssistantScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /analyze/i }));
     expect(await screen.findByText('Server error')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     expect(await screen.findByText(MOCK_RESULT.summary)).toBeInTheDocument();
   });
 
@@ -144,7 +144,7 @@ describe('AssistantScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /analyze/i }));
     expect(await screen.findByText('Diagnosis Result')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /new query/i }));
+    fireEvent.click(screen.getByRole('button', { name: /start new diagnosis/i }));
     expect(screen.getByRole('button', { name: /analyze/i })).toBeInTheDocument();
     expect(screen.queryByText('Diagnosis Result')).not.toBeInTheDocument();
   });

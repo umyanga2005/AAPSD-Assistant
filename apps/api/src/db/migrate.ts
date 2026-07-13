@@ -15,3 +15,8 @@ export async function runMigrations(): Promise<void> {
 
   await pool.end();
 }
+
+runMigrations().catch((err) => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});

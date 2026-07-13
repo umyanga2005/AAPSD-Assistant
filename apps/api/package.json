@@ -7,12 +7,12 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/index.js",
-    "dev": "node --watch --import tsx src/index.ts",
+    "start": "node --env-file=.env dist/index.js",
+    "dev": "node --watch --env-file=.env --import tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts",
+    "db:migrate": "node --env-file=.env --import tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

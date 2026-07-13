@@ -1,0 +1,308 @@
+I checked the current repository. OpenCode has completed the basic setup and created a read-only diagnosis prototype, but it has not built the actual web application or real integrations yet.
+Current status:
+Area	Status
+Monorepo, TypeScript, ESLint, Prettier, Husky	Complete
+Git history / clean working tree	Complete
+Shared diagnosis contracts	Complete
+Secret redaction and model-output validation	Prototype complete
+Diagnosis unit tests	Created
+React web application	Not started — only placeholder file
+Backend API	Not started — only placeholder file
+PostgreSQL, Redis, Docker Compose	Not started
+Login / RBAC persistence	Not started
+Real OpenRouter model call	Not started — currently uses a hard-coded sample response
+GitHub, Kubernetes, Prometheus integrations	Not started — currently stubs
+Policy/approval/executor	Not started
+
+Important: the diagnosis package is a good starting prototype, but do not call Phase 2 complete yet. It currently returns fake GitHub/Kubernetes/Prometheus evidence and a fake model answer.
+Use the following prompts in this order. Give OpenCode only one prompt, wait for it to finish, review, test, and commit before giving the next one.
+Prompt 1 — Verify current setup first
+Read AGENTS.md, Plans/01-foundation.md, and Plans/02-read-only-intelligence.md.
+
+Do not add features yet.
+
+Inspect the current repository and verify the existing quality commands on Windows using npm.cmd:
+
+- npm.cmd run test --workspace=@aapsd/diagnosis
+- npm.cmd run lint
+- npm.cmd run format
+- npm.cmd run typecheck
+- npm.cmd run build
+
+If any command fails, determine whether it is a project configuration problem or only a local environment/sandbox problem.
+
+Make the smallest safe fix only if it is a project problem. Do not change product features. Report:
+- command results,
+- root cause of every failure,
+- files changed,
+- verification steps.
+Prompt 2 — Create the real backend API application
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: replace the placeholder apps/api application with a minimal Fastify + TypeScript API.
+
+Requirements:
+- Add GET /health returning JSON with status, service name, and timestamp.
+- Add GET /ready returning JSON.
+- Use a configurable PORT with a safe local default.
+- Add centralized error handling.
+- Do not add authentication, database access, AI calls, or DevOps integrations yet.
+- Add API unit/integration tests for /health and /ready.
+- Add a development script for the API.
+- Update README with commands to start and test the API.
+
+Run relevant tests, lint, format, typecheck, and build.
+Prompt 3 — Create the real React frontend
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: replace the placeholder apps/web application with a Vite + React + TypeScript frontend.
+
+Requirements:
+- Create a clean dashboard shell with header, sidebar, main content area, and responsive layout.
+- Include placeholders for Dashboard, Assistant, Pipelines, Infrastructure, Incidents, and Audit Log.
+- Add an API health-status indicator that calls the backend health endpoint.
+- Use environment configuration for the backend base URL.
+- Do not add login, real AI chat, credentials, or DevOps integrations.
+- Add a component test or equivalent test for the health-status UI.
+- Update README with frontend start instructions.
+
+Run relevant tests, lint, format, typecheck, and build.
+Prompt 4 — Add Docker Compose for local services
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: create a local Docker Compose development environment.
+
+Requirements:
+- Add PostgreSQL and Redis services only.
+- Use named volumes for persistent local data.
+- Use safe default development credentials supplied through a local .env file.
+- Create .env.example without real secrets.
+- Ensure .env remains ignored by Git.
+- Add health checks for PostgreSQL and Redis.
+- Do not containerize the frontend or API yet.
+- Update README with docker compose startup, shutdown, and reset instructions.
+
+Validate the Compose file syntax and report the exact local commands required.
+Prompt 5 — Add environment validation
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: add typed environment configuration validation to apps/api.
+
+Requirements:
+- Validate PORT, DATABASE_URL, REDIS_URL, CORS_ORIGIN, and NODE_ENV at startup.
+- Fail safely with clear messages for invalid required values.
+- Keep all secrets out of logs.
+- Add unit tests for valid configuration, missing required values, and invalid values.
+- Update .env.example and README as needed.
+- Do not add OpenRouter credentials yet.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 6 — Create the database schema
+Read AGENTS.md, Plans/01-foundation.md, and Plans/02-read-only-intelligence.md.
+
+Implement only this task: add PostgreSQL persistence using a TypeScript ORM and migrations.
+
+Create the first schema for:
+- users
+- projects
+- environments
+- requests
+- audit_events
+
+Requirements:
+- Use UUID primary keys.
+- Add created_at and updated_at timestamps where appropriate.
+- Define foreign keys and indexes.
+- Audit events must include actor ID, event type, trace ID, target type, target ID, and JSON metadata.
+- Create an initial migration.
+- Add a database health check or connection test.
+- Do not add production credentials or real OAuth yet.
+- Document migration commands.
+
+Run tests and type checks.
+Prompt 7 — Add audit-event service
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: create an audit-event service in the API.
+
+Requirements:
+- Provide one typed function to record audit events.
+- Record request creation, authorization denial, and system errors.
+- Never record raw secrets, unredacted logs, or API keys.
+- Add unit tests proving sensitive fields are not stored.
+- Add a GET endpoint for viewing audit events for one project, temporarily protected by a simple development project ID input.
+- Do not implement full authentication yet.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 8 — Add development identity and RBAC
+Read AGENTS.md and Plans/01-foundation.md.
+
+Implement only this task: add temporary development authentication and RBAC.
+
+Requirements:
+- Support roles: viewer, developer, devops_engineer, approver, administrator.
+- Use a development-only request header or local mock identity; clearly mark it as temporary.
+- Add middleware that rejects unauthorized requests with 401 or 403.
+- Persist users and project memberships in the database.
+- Add tests for allowed and denied access.
+- Audit denied access attempts.
+- Do not implement GitHub OAuth/OIDC yet.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 9 — Expose diagnosis through the backend API
+Read AGENTS.md, Plans/02-read-only-intelligence.md, and the existing packages/diagnosis code.
+
+Implement only this task: add a POST /api/v1/diagnoses endpoint in apps/api.
+
+Requirements:
+- Validate request input using a runtime schema.
+- Get user identity and roles from the existing development auth middleware.
+- Call the existing read-only diagnosis workflow.
+- Return the typed diagnosis result.
+- Create and audit a request record.
+- Return safe validation errors.
+- Do not add a real OpenRouter call yet.
+- Add endpoint tests for success, missing fields, unauthorized user, and malformed input.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 10 — Build the Assistant screen
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: build the React Assistant screen.
+
+Requirements:
+- Add a natural-language diagnosis form.
+- Accept query, optional pipeline run ID, optional pod name, and optional time range.
+- Call POST /api/v1/diagnoses.
+- Display loading, error, empty, and success states.
+- Show summary, confidence, evidence, likely causes, and recommendations clearly.
+- Display a clear “read-only analysis” label.
+- Do not add action buttons, approvals, or execution controls.
+- Add frontend tests for form submission and error display.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 11 — Replace fake model answer with a safe provider interface
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: replace the hard-coded default model response with a provider abstraction.
+
+Requirements:
+- Create a model-provider interface.
+- Keep a deterministic fake provider for unit tests and local development.
+- Add an OpenRouter-compatible provider, but do not require an API key for tests.
+- Read OPENROUTER_API_KEY and OPENROUTER_MODEL only from server environment variables.
+- Validate structured model output before returning it.
+- Set strict timeout and safe error handling.
+- Never log prompts, authorization headers, or API keys.
+- Update .env.example with placeholder names only.
+- Add tests for fake provider, timeout, malformed output, and missing configuration.
+
+Do not send real client logs to OpenRouter in this task.
+Prompt 12 — Improve secret redaction
+Read AGENTS.md, Plans/02-read-only-intelligence.md, and the existing redactor implementation.
+
+Implement only this task: strengthen redaction before any external model call.
+
+Requirements:
+- Redact secrets in both logs and metadata.
+- Add patterns for OpenRouter keys, GitHub fine-grained tokens, JWT-like tokens, database URLs, authorization headers, private keys, and common cloud credentials.
+- Preserve useful non-sensitive debugging context.
+- Add regression tests for every added pattern.
+- Ensure the diagnosis workflow redacts all evidence before constructing a model prompt.
+- Do not connect real GitHub, Kubernetes, or Prometheus yet.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 13 — Add runbook retrieval from local documents
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: replace the stub runbook retrieval with local approved runbook retrieval.
+
+Requirements:
+- Use docs/runbooks as the approved source directory.
+- Add three sample non-sensitive runbooks:
+  1. GitHub Actions deployment failure
+  2. Kubernetes ImagePullBackOff
+  3. High CPU / memory troubleshooting
+- Implement simple local keyword/tag retrieval first; do not add a vector database yet.
+- Return the most relevant runbook with source metadata.
+- Add tests for matching, no-match, and malformed documents.
+- Ensure no external documents are fetched automatically.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 14 — Add GitHub read-only integration adapter
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: create a GitHub Actions read-only adapter.
+
+Requirements:
+- Define an interface for fetching workflow run status, jobs, and sanitized logs.
+- Implement a mock adapter used by tests and local demo mode.
+- Add a real GitHub adapter skeleton using environment-based credentials, but do not enable mutation operations.
+- Enforce repository allow-list configuration.
+- Redact logs before returning evidence.
+- Do not implement workflow dispatch in this task.
+- Add tests for mock evidence, missing configuration, API failure, and redaction.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 15 — Add Kubernetes read-only integration adapter
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: create a Kubernetes read-only adapter.
+
+Requirements:
+- Support reading pod status, events, recent logs, and deployment status.
+- Enforce namespace allow-list configuration.
+- Use a mock adapter for tests and local demo mode.
+- Add a real adapter skeleton with read-only permissions only.
+- Redact all logs and metadata before diagnosis.
+- Do not add restart, scale, apply, delete, exec, or shell-command features.
+- Add tests for namespace restriction, missing configuration, adapter failure, and sanitized evidence.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 16 — Add Prometheus read-only adapter
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: create a Prometheus read-only adapter.
+
+Requirements:
+- Support CPU, memory, pod restart, error-rate, and latency queries.
+- Use validated, predefined query templates; do not execute arbitrary PromQL from user input.
+- Provide a mock adapter for tests.
+- Return normalized evidence with timestamps and query names.
+- Add tests for allowed metric queries, rejected query names, timeout, and provider failure.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 17 — Integrate real evidence into diagnosis
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: connect the diagnosis workflow to the GitHub, Kubernetes, Prometheus, and runbook adapters.
+
+Requirements:
+- Use dependency injection so tests remain fully offline.
+- Collect only evidence requested by valid context fields.
+- Continue diagnosis if one optional read-only source fails, but show the unavailable source clearly.
+- Return “insufficient evidence” when there is no usable evidence.
+- Ensure all evidence is redacted before model input and UI output.
+- Add integration tests using mocks for successful collection, partial failure, and no evidence.
+
+Run tests, lint, format, typecheck, and build.
+Prompt 18 — Create pipeline and infrastructure dashboards
+Read AGENTS.md and Plans/02-read-only-intelligence.md.
+
+Implement only this task: build read-only Pipelines and Infrastructure frontend pages.
+
+Requirements:
+- Pipelines page: workflow runs, status, duration, failed job summary, diagnosis link.
+- Infrastructure page: deployment health, pods, restart count, CPU, and memory.
+- Use mock/demo API data if backend endpoints are not ready.
+- Include loading, empty, and error states.
+- Clearly label all data as read-only.
+- Do not add action buttons or deployment controls.
+- Add component tests for rendering and error states.
+
+Run tests, lint, format, typecheck, and build.
+After Prompt 18, stop and use [Plans/07-final-system-checklist.md](/C:/Users/isuru/Downloads/Codex/AAPSD-Assistant/Plans/07-final-system-checklist.md) to review the complete read-only MVP.
+Do not start Phase 3 action execution until the read-only version works with mocks, has a functioning UI/API/database flow, and has passed the checklist.
+
+
+11:52 AM

@@ -1,4 +1,5 @@
 export { runDiagnosis } from './workflow.js';
+export type { EvidenceCollector, EvidenceCollectorOptions } from './evidence-collector-types.js';
 export { redactSecrets, redactEvidence } from './redactor.js';
 export { authorizeRequest } from './authorizer.js';
 export { analyzeWithModel, validateModelResponse } from './analyzer.js';
@@ -7,6 +8,8 @@ export {
   collectGitHubEvidence,
   collectKubernetesEvidence,
   collectPrometheusEvidence,
+  collectRequestedEvidence,
+  createDefaultEvidenceCollector,
 } from './evidence-collector.js';
 export { retrieveRunbook } from './runbook-service.js';
 export type { ModelProvider } from './model-provider/types.js';
