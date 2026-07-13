@@ -7,9 +7,13 @@ import Fastify, {
   type FastifyReply,
 } from 'fastify';
 import { getConfig, ConfigError } from './config.js';
+import { getDb } from './db/index.js';
+import { requests } from './db/schema.js';
 import { testConnection } from './db/index.js';
 import { getAuditEventsByProject, recordAuditEvent } from './services/audit.js';
 import { resolveDevUser, getProjectRole, hasRole, isRole } from './services/auth.js';
+import { validateDiagnoseBody } from './services/validation.js';
+import { runDiagnosis } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
 
 export function buildApp(): FastifyInstance {
@@ -143,6 +147,74 @@ export function buildApp(): FastifyInstance {
       }
     },
   );
+
+  app.post('/api/v1/diagnoses', { preHandler: [devAuthPreHandler] }, async (request, reply) => {
+    const user = (request as unknown as Record<string, unknown>).user as DevUser;
+    const validation = validateDiagnoseBody(request.body);
+
+    if (!validation.valid) {
+      return reply.status(400).send({
+        error: 'Validation failed',
+        details: validation.errors.map((e) => `${e.field}: ${e.message}`),
+        statusCode: 400,
+      });
+    }
+
+    const { projectId, environmentId, query, context } = validation.data;
+    const traceId = crypto.randomUUID();
+    const requestId = crypto.randomUUID();
+
+    try {
+      await getDb().insert(requests).values({
+        id: requestId,
+        userId: user.id,
+        projectId,
+        environmentId,
+        action: 'diagnose',
+        query,
+        status: 'completed',
+        traceId,
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        statusCode: 500,
+      });
+    }
+
+    const diagnosisRequest = {
+      userId: user.id,
+      projectId,
+      environmentId,
+      query,
+      traceId,
+      context,
+    };
+
+    let result;
+    try {
+      result = await runDiagnosis(diagnosisRequest, [user.role]);
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        statusCode: 500,
+      });
+    }
+
+    recordAuditEvent({
+      actorId: user.id,
+      projectId,
+      eventType: 'request.created',
+      traceId,
+      targetType: 'diagnosis',
+      targetId: requestId,
+      metadata: { query },
+    }).catch(() => {});
+
+    return reply.status(200).send(result);
+  });
 
   return app;
 }

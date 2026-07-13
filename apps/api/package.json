@@ -16,6 +16,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@aapsd/contracts": "*",
+    "@aapsd/diagnosis": "*",
     "drizzle-orm": "^0.38.0",
     "fastify": "^5.0.0",
     "pg": "^8.13.0"
