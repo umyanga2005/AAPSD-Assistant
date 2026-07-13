@@ -9,3 +9,5 @@ export {
   collectPrometheusEvidence,
   retrieveRunbook,
 } from './evidence-collector.js';
+export type { ModelProvider } from './model-provider/types.js';
+export { FakeModelProvider, OpenRouterModelProvider } from './model-provider/index.js';

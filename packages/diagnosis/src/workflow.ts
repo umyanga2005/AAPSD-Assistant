@@ -1,4 +1,5 @@
 import type { DiagnosisRequest, DiagnosisResult } from '@aapsd/contracts';
+import type { ModelProvider } from './model-provider/types.js';
 import { authorizeRequest } from './authorizer.js';
 import { collectAllEvidence, retrieveRunbook } from './evidence-collector.js';
 import { redactEvidence } from './redactor.js';
@@ -7,6 +8,7 @@ import { analyzeWithModel } from './analyzer.js';
 export async function runDiagnosis(
   request: DiagnosisRequest,
   userRoles: string[],
+  provider?: ModelProvider,
 ): Promise<DiagnosisResult> {
   const auth = authorizeRequest(request, userRoles);
   if (!auth.authorized) {
@@ -40,7 +42,7 @@ export async function runDiagnosis(
 
   let modelResponse;
   try {
-    modelResponse = await analyzeWithModel(prompt);
+    modelResponse = await analyzeWithModel(prompt, provider);
   } catch {
     return {
       requestId: request.traceId,

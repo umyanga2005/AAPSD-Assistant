@@ -13,10 +13,24 @@ import { testConnection } from './db/index.js';
 import { getAuditEventsByProject, recordAuditEvent } from './services/audit.js';
 import { resolveDevUser, getProjectRole, hasRole, isRole } from './services/auth.js';
 import { validateDiagnoseBody } from './services/validation.js';
-import { runDiagnosis } from '@aapsd/diagnosis';
+import {
+  runDiagnosis,
+  FakeModelProvider,
+  OpenRouterModelProvider,
+  type ModelProvider,
+} from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
 
+function createModelProvider(): ModelProvider {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (apiKey) {
+    return new OpenRouterModelProvider({ apiKey });
+  }
+  return new FakeModelProvider();
+}
+
 export function buildApp(): FastifyInstance {
+  const modelProvider = createModelProvider();
   const app = Fastify({
     logger: true,
   });
@@ -194,7 +208,7 @@ export function buildApp(): FastifyInstance {
 
     let result;
     try {
-      result = await runDiagnosis(diagnosisRequest, [user.role]);
+      result = await runDiagnosis(diagnosisRequest, [user.role], modelProvider);
     } catch (err) {
       app.log.error(err);
       return reply.status(500).send({

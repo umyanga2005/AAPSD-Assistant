@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeWithModel, validateModelResponse } from '../src/analyzer.js';
+import { FakeModelProvider } from '../src/model-provider/fake.js';
+import type { ModelProvider } from '../src/model-provider/types.js';
+
+const fakeProvider = new FakeModelProvider();
 
 describe('analyzeWithModel', () => {
   it('returns a valid ModelResponse on success', async () => {
-    const result = await analyzeWithModel('Why did deployment fail?');
+    const result = await analyzeWithModel('Why did deployment fail?', fakeProvider);
     expect(result).toHaveProperty('summary');
     expect(result).toHaveProperty('evidence');
     expect(result).toHaveProperty('likely_causes');
@@ -78,10 +82,12 @@ describe('malformed model output', () => {
 
 describe('model timeout', () => {
   it('throws when request exceeds timeout', async () => {
-    const slowModel = () =>
-      new Promise<unknown>((resolve) => setTimeout(() => resolve({ summary: 'late' }), 500));
+    const slowProvider: ModelProvider = {
+      generate: () =>
+        new Promise<unknown>((resolve) => setTimeout(() => resolve({ summary: 'late' }), 500)),
+    };
 
-    await expect(analyzeWithModel('test', { timeoutMs: 50 }, slowModel)).rejects.toThrow(
+    await expect(analyzeWithModel('test', slowProvider, 50)).rejects.toThrow(
       'Model request timed out',
     );
   });

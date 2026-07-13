@@ -9,9 +9,13 @@ vi.mock('../src/db/index.js', () => ({
   getDb: vi.fn(),
 }));
 
-vi.mock('@aapsd/diagnosis', () => ({
-  runDiagnosis: vi.fn(),
-}));
+vi.mock('@aapsd/diagnosis', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@aapsd/diagnosis')>();
+  return {
+    ...actual,
+    runDiagnosis: vi.fn(),
+  };
+});
 
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 const DEV_PROJECT_ID = '00000000-0000-0000-0000-000000000002';
