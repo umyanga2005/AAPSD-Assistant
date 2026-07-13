@@ -15,16 +15,16 @@ Turn the academic methodology into an agreed product scope before writing applic
 
 ## MVP action matrix
 
-| Action | MVP status | Rule |
-|---|---|---|
-| View pipeline status/logs | Enabled | Read-only |
-| Analyze Kubernetes pod logs | Enabled | Read-only, secrets redacted |
-| View CPU/memory metrics | Enabled | Read-only |
-| Trigger staging workflow | Enabled | Approval required |
-| Scale staging deployment within limit | Enabled | Approval required |
-| Restart staging deployment | Enabled | Approval required |
-| Apply Terraform | Deferred | Never direct from AI in MVP |
-| Delete resources / change secrets | Prohibited | Manual operational procedure only |
+| Action                                | MVP status | Rule                              |
+| ------------------------------------- | ---------- | --------------------------------- |
+| View pipeline status/logs             | Enabled    | Read-only                         |
+| Analyze Kubernetes pod logs           | Enabled    | Read-only, secrets redacted       |
+| View CPU/memory metrics               | Enabled    | Read-only                         |
+| Trigger staging workflow              | Enabled    | Approval required                 |
+| Scale staging deployment within limit | Enabled    | Approval required                 |
+| Restart staging deployment            | Enabled    | Approval required                 |
+| Apply Terraform                       | Deferred   | Never direct from AI in MVP       |
+| Delete resources / change secrets     | Prohibited | Manual operational procedure only |
 
 ## Example acceptance criteria
 
@@ -49,4 +49,3 @@ And no GitHub workflow is triggered before approval.
 - Client approves MVP boundaries.
 - Sandbox credentials exist and are least-privilege.
 - Team agrees that production control is out of the first release.
-

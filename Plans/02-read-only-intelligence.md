@@ -46,4 +46,3 @@ Confidence: High
 - Secrets and tokens are redacted before model calls and before UI display.
 - AI cannot trigger API mutations in this phase.
 - Automated tests cover failed API calls, malformed logs, LLM timeouts, and no-evidence cases.
-

@@ -34,4 +34,3 @@ Expected: The request is rejected as prohibited; no executor job is created; eve
 - Failure modes are documented in an operational runbook.
 - Alerts exist for unavailable integrations, failed executor jobs, and abnormal LLM cost.
 - Disaster recovery backup/restore is demonstrated.
-

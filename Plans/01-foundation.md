@@ -49,4 +49,3 @@ docs/
 - Unauthorized API requests return `403` and are audited.
 - Every user request receives a trace ID and audit-event record.
 - CI runs lint, unit tests, type checks, and dependency vulnerability checks.
-

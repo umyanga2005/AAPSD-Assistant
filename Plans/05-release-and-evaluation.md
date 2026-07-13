@@ -6,14 +6,14 @@ Validate that the application solves real DevOps tasks and can be handed to user
 
 ## Test groups
 
-| Group | Focus |
-|---|---|
-| Unit | Policies, redaction, validation, integration adapters |
-| Integration | GitHub, Kubernetes, Prometheus, database, queue, AI service |
-| End-to-end | Diagnose failure, request action, approve, execute, verify |
-| Security | RBAC, injection, secrets, webhook verification, audit completeness |
-| Performance | API responsiveness, concurrent requests, job processing |
-| UAT | Clarity, usefulness, trust, workflow completion |
+| Group       | Focus                                                              |
+| ----------- | ------------------------------------------------------------------ |
+| Unit        | Policies, redaction, validation, integration adapters              |
+| Integration | GitHub, Kubernetes, Prometheus, database, queue, AI service        |
+| End-to-end  | Diagnose failure, request action, approve, execute, verify         |
+| Security    | RBAC, injection, secrets, webhook verification, audit completeness |
+| Performance | API responsiveness, concurrent requests, job processing            |
+| UAT         | Clarity, usefulness, trust, workflow completion                    |
 
 ## UAT scenarios
 
@@ -46,4 +46,3 @@ Validate that the application solves real DevOps tasks and can be handed to user
 - All critical and high defects are fixed or explicitly accepted by the client.
 - UAT users complete agreed scenarios.
 - Release candidate passes `07-final-system-checklist.md`.
-

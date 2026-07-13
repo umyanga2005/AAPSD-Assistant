@@ -8,6 +8,7 @@ For every task:
 4. Run tests/lint/type-check after implementation
 5. Review the changed files yourself
 6. Commit the completed task before moving on using this git workflow:
+
 ```
 git status
 git add .

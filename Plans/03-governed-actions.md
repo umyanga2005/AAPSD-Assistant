@@ -49,4 +49,3 @@ Verification: Confirm all 3 pods are Ready within 5 minutes
 - Rejected/expired approvals cannot be executed.
 - Each action reports a final success, failure, or timed-out verification state.
 - Integration tests use a sandbox cluster and test GitHub workflow.
-

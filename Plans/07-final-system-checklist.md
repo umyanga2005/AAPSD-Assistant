@@ -47,10 +47,9 @@ Run this checklist before a release candidate is demonstrated, submitted, or dep
 
 ## Sign-off
 
-| Role | Name | Date | Decision |
-|---|---|---|---|
-| Product/client owner |  |  |  |
-| Technical lead |  |  |  |
-| Security reviewer |  |  |  |
-| DevOps owner |  |  |  |
-
+| Role                 | Name | Date | Decision |
+| -------------------- | ---- | ---- | -------- |
+| Product/client owner |      |      |          |
+| Technical lead       |      |      |          |
+| Security reviewer    |      |      |          |
+| DevOps owner         |      |      |          |
