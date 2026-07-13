@@ -4,6 +4,7 @@
     { "path": "apps/web" },
     { "path": "apps/api" },
     { "path": "packages/contracts" },
-    { "path": "packages/policy" }
+    { "path": "packages/policy" },
+    { "path": "packages/diagnosis" }
   ]
 }
