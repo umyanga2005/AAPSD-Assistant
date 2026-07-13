@@ -1,5 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
-import { getConfig } from './config.js';
+import { getConfig, ConfigError } from './config.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -34,7 +35,17 @@ export function buildApp(): FastifyInstance {
 }
 
 async function start(): Promise<void> {
-  const config = getConfig();
+  let config;
+  try {
+    config = getConfig();
+  } catch (err: unknown) {
+    if (err instanceof ConfigError) {
+      console.error(err.message);
+      process.exit(1);
+    }
+    throw err;
+  }
+
   const app = buildApp();
 
   try {
@@ -46,4 +57,7 @@ async function start(): Promise<void> {
   }
 }
 
-start();
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainModule) {
+  start();
+}

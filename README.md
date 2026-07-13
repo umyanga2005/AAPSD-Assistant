@@ -40,7 +40,23 @@ curl http://localhost:3000/health
 curl http://localhost:3000/ready
 ```
 
-The `PORT` environment variable configures the listen port (default: `3000`).
+### Configuration (apps/api/.env)
+
+| Variable       | Required | Default                 | Description                            |
+| -------------- | -------- | ----------------------- | -------------------------------------- |
+| `PORT`         | No       | `3000`                  | HTTP listen port                       |
+| `DATABASE_URL` | **Yes**  | —                       | PostgreSQL connection string           |
+| `REDIS_URL`    | **Yes**  | —                       | Redis connection string                |
+| `CORS_ORIGIN`  | No       | `http://localhost:5173` | Allowed CORS origin                    |
+| `NODE_ENV`     | No       | `development`           | `development`, `production`, or `test` |
+
+The API validates configuration at startup and exits with a clear message if required values are missing or invalid. Secrets are never included in logs.
+
+Copy the example file to get started:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
 
 ## Frontend
 

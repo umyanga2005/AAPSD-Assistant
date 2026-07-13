@@ -1,10 +1,73 @@
 export interface AppConfig {
   port: number;
+  databaseUrl: string;
+  redisUrl: string;
+  corsOrigin: string;
+  nodeEnv: 'development' | 'production' | 'test';
+}
+
+export class ConfigError extends Error {
+  constructor(errors: string[]) {
+    const message = `Configuration errors:\n${errors.map((e) => `  - ${e}`).join('\n')}`;
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+function isPositiveInteger(value: number): boolean {
+  return Number.isFinite(value) && value > 0 && Number.isInteger(value);
+}
+
+function isNodeEnv(value: string): value is AppConfig['nodeEnv'] {
+  return ['development', 'production', 'test'].includes(value);
 }
 
 export function getConfig(): AppConfig {
-  const port = parseInt(process.env.PORT ?? '', 10);
+  const errors: string[] = [];
+
+  const portRaw = process.env.PORT ?? '';
+  const port = parseInt(portRaw, 10);
+  if (portRaw && !isPositiveInteger(port)) {
+    errors.push(`PORT must be a positive integer, got "${portRaw}"`);
+  }
+
+  const databaseUrl = process.env.DATABASE_URL ?? '';
+  if (!databaseUrl) {
+    errors.push('DATABASE_URL is required but was not set');
+  }
+
+  const redisUrl = process.env.REDIS_URL ?? '';
+  if (!redisUrl) {
+    errors.push('REDIS_URL is required but was not set');
+  }
+
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+
+  const nodeEnvRaw = process.env.NODE_ENV ?? '';
+  if (nodeEnvRaw && !isNodeEnv(nodeEnvRaw)) {
+    errors.push(`NODE_ENV must be one of: development, production, test. Got "${nodeEnvRaw}"`);
+  }
+
+  if (errors.length > 0) {
+    throw new ConfigError(errors);
+  }
+
   return {
-    port: Number.isFinite(port) ? port : 3000,
+    port: portRaw ? port : 3000,
+    databaseUrl,
+    redisUrl,
+    corsOrigin,
+    nodeEnv: nodeEnvRaw ? (nodeEnvRaw as AppConfig['nodeEnv']) : 'development',
   };
+}
+
+export function getConfigSafe(): AppConfig | { _errors: string[] } {
+  try {
+    return getConfig();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      return { _errors: err.message.split('\n') };
+    }
+    throw err;
+  }
 }
