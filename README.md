@@ -42,11 +42,28 @@ curl http://localhost:3000/ready
 
 The `PORT` environment variable configures the listen port (default: `3000`).
 
+## Frontend
+
+```bash
+# Start the development server (localhost:5173)
+cd apps/web && npm run dev
+
+# Production build
+cd apps/web && npm run build
+```
+
+Configure the backend URL in `apps/web/.env`:
+
+```
+VITE_API_URL=http://localhost:3000
+```
+
 ## Tests
 
 ```bash
 # Run all tests
 npm run test --workspace=@aapsd/api
+npm run test --workspace=@aapsd/web
 npm run test --workspace=@aapsd/diagnosis
 ```
 
