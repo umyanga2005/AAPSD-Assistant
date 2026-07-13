@@ -6,7 +6,7 @@ import Fastify, {
   type FastifyRequest,
   type FastifyReply,
 } from 'fastify';
-import { getConfig, ConfigError } from './config.js';
+import { getConfig, getConfigSafe, ConfigError } from './config.js';
 import { getDb } from './db/index.js';
 import { requests } from './db/schema.js';
 import { testConnection } from './db/index.js';
@@ -17,6 +17,9 @@ import {
   runDiagnosis,
   FakeModelProvider,
   OpenRouterModelProvider,
+  RealGitHubAdapter,
+  MockGitHubAdapter,
+  setGitHubAdapter,
   type ModelProvider,
 } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
@@ -31,6 +34,19 @@ function createModelProvider(): ModelProvider {
 
 export function buildApp(): FastifyInstance {
   const modelProvider = createModelProvider();
+  const config = getConfigSafe();
+  if ('_errors' in config) {
+    console.warn('Config errors, skipping GitHub adapter setup:', config._errors);
+  } else if (config.gitHubToken) {
+    const adapter = new RealGitHubAdapter({
+      token: config.gitHubToken,
+      allowedRepos: config.gitHubAllowedRepos,
+    });
+    setGitHubAdapter(adapter);
+  } else {
+    setGitHubAdapter(new MockGitHubAdapter());
+  }
+
   const app = Fastify({
     logger: true,
   });

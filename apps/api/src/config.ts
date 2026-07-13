@@ -4,6 +4,8 @@ export interface AppConfig {
   redisUrl: string;
   corsOrigin: string;
   nodeEnv: 'development' | 'production' | 'test';
+  gitHubToken?: string;
+  gitHubAllowedRepos: string[];
 }
 
 export class ConfigError extends Error {
@@ -48,6 +50,15 @@ export function getConfig(): AppConfig {
     errors.push(`NODE_ENV must be one of: development, production, test. Got "${nodeEnvRaw}"`);
   }
 
+  const gitHubToken = process.env.GITHUB_TOKEN || undefined;
+  const allowedReposRaw = process.env.GITHUB_ALLOWED_REPOS || '';
+  const gitHubAllowedRepos = allowedReposRaw
+    ? allowedReposRaw
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean)
+    : [];
+
   if (errors.length > 0) {
     throw new ConfigError(errors);
   }
@@ -58,6 +69,8 @@ export function getConfig(): AppConfig {
     redisUrl,
     corsOrigin,
     nodeEnv: nodeEnvRaw ? (nodeEnvRaw as AppConfig['nodeEnv']) : 'development',
+    gitHubToken,
+    gitHubAllowedRepos,
   };
 }
 

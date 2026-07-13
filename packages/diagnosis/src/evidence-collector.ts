@@ -1,10 +1,16 @@
 import type { CollectedEvidence } from '@aapsd/contracts';
+import { getGitHubAdapter } from './github-adapter/index.js';
 
-export async function collectGitHubEvidence(_pipelineRunId?: string): Promise<CollectedEvidence> {
+export async function collectGitHubEvidence(pipelineRunId?: string): Promise<CollectedEvidence> {
+  const adapter = getGitHubAdapter();
+  if (adapter) {
+    return adapter.collectEvidence(pipelineRunId ?? undefined);
+  }
+
   return {
     source: 'github',
     logs: ['[stub] GitHub Actions logs not yet connected'],
-    metadata: { pipelineRunId: _pipelineRunId ?? null },
+    metadata: { pipelineRunId: pipelineRunId ?? null },
   };
 }
 

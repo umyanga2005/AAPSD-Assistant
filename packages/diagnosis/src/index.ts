@@ -11,3 +11,17 @@ export {
 export { retrieveRunbook } from './runbook-service.js';
 export type { ModelProvider } from './model-provider/types.js';
 export { FakeModelProvider, OpenRouterModelProvider } from './model-provider/index.js';
+export {
+  setGitHubAdapter,
+  getGitHubAdapter,
+  MockGitHubAdapter,
+  RealGitHubAdapter,
+  GitHubApiError,
+} from './github-adapter/index.js';
+export type {
+  GitHubAdapter,
+  GitHubConfig,
+  WorkflowRun,
+  Job,
+  Step,
+} from './github-adapter/index.js';
