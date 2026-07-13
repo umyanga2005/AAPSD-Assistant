@@ -13,3 +13,13 @@ git status
 git add .
 git commit -m "feat: add application foundation"
 ```
+
+# Guardrails
+
+- Do not expose secrets.
+- Do not create unrestricted shell execution.
+- Do not give AI direct cloud, GitHub, Docker, or Kubernetes credentials.
+- Use typed inputs and a policy-controlled executor.
+- Implement staging-only actions first.
+- Do not change unrelated files.
+- Run tests after each change.
