@@ -1,5 +1,6 @@
 import Header from './components/Header.js';
 import Sidebar from './components/Sidebar.js';
+import AssistantScreen from './components/AssistantScreen.js';
 import './App.css';
 
 const PAGES: Record<string, { title: string; description: string }> = {
@@ -32,7 +33,7 @@ const PAGES: Record<string, { title: string; description: string }> = {
 const DEFAULT_PAGE = 'dashboard';
 
 export default function App() {
-  const page = DEFAULT_PAGE;
+  const page: string = DEFAULT_PAGE;
   const current = PAGES[page];
 
   return (
@@ -40,8 +41,14 @@ export default function App() {
       <Header />
       <Sidebar pages={PAGES} active={page} />
       <main className="main-content">
-        <h1>{current.title}</h1>
-        <p>{current.description}</p>
+        {page === 'assistant' ? (
+          <AssistantScreen />
+        ) : (
+          <>
+            <h1>{current.title}</h1>
+            <p>{current.description}</p>
+          </>
+        )}
       </main>
     </div>
   );
