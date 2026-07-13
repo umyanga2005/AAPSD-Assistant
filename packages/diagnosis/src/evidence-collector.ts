@@ -1,5 +1,6 @@
 import type { CollectedEvidence } from '@aapsd/contracts';
 import { getGitHubAdapter } from './github-adapter/index.js';
+import { getK8sAdapter } from './k8s-adapter/index.js';
 
 export async function collectGitHubEvidence(pipelineRunId?: string): Promise<CollectedEvidence> {
   const adapter = getGitHubAdapter();
@@ -14,11 +15,16 @@ export async function collectGitHubEvidence(pipelineRunId?: string): Promise<Col
   };
 }
 
-export async function collectKubernetesEvidence(_podName?: string): Promise<CollectedEvidence> {
+export async function collectKubernetesEvidence(podName?: string): Promise<CollectedEvidence> {
+  const adapter = getK8sAdapter();
+  if (adapter) {
+    return adapter.collectEvidence(podName ?? undefined);
+  }
+
   return {
     source: 'kubernetes',
     logs: ['[stub] Kubernetes pod logs not yet connected'],
-    metadata: { podName: _podName ?? null },
+    metadata: { podName: podName ?? null },
   };
 }
 

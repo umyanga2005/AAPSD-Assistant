@@ -20,6 +20,9 @@ import {
   RealGitHubAdapter,
   MockGitHubAdapter,
   setGitHubAdapter,
+  RealK8sAdapter,
+  MockK8sAdapter,
+  setK8sAdapter,
   type ModelProvider,
 } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
@@ -36,15 +39,28 @@ export function buildApp(): FastifyInstance {
   const modelProvider = createModelProvider();
   const config = getConfigSafe();
   if ('_errors' in config) {
-    console.warn('Config errors, skipping GitHub adapter setup:', config._errors);
-  } else if (config.gitHubToken) {
-    const adapter = new RealGitHubAdapter({
-      token: config.gitHubToken,
-      allowedRepos: config.gitHubAllowedRepos,
-    });
-    setGitHubAdapter(adapter);
+    console.warn('Config errors, skipping adapter setup:', config._errors);
   } else {
-    setGitHubAdapter(new MockGitHubAdapter());
+    if (config.gitHubToken) {
+      const ghAdapter = new RealGitHubAdapter({
+        token: config.gitHubToken,
+        allowedRepos: config.gitHubAllowedRepos,
+      });
+      setGitHubAdapter(ghAdapter);
+    } else {
+      setGitHubAdapter(new MockGitHubAdapter());
+    }
+
+    if (config.k8sToken) {
+      const k8sAdapter = new RealK8sAdapter({
+        token: config.k8sToken,
+        apiServerUrl: config.k8sApiServerUrl,
+        allowedNamespaces: config.k8sAllowedNamespaces,
+      });
+      setK8sAdapter(k8sAdapter);
+    } else {
+      setK8sAdapter(new MockK8sAdapter());
+    }
   }
 
   const app = Fastify({

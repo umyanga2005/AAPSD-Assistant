@@ -6,6 +6,9 @@ export interface AppConfig {
   nodeEnv: 'development' | 'production' | 'test';
   gitHubToken?: string;
   gitHubAllowedRepos: string[];
+  k8sToken?: string;
+  k8sApiServerUrl?: string;
+  k8sAllowedNamespaces: string[];
 }
 
 export class ConfigError extends Error {
@@ -59,6 +62,16 @@ export function getConfig(): AppConfig {
         .filter(Boolean)
     : [];
 
+  const k8sToken = process.env.K8S_TOKEN || undefined;
+  const k8sApiServerUrl = process.env.K8S_API_SERVER_URL || undefined;
+  const allowedNamespacesRaw = process.env.K8S_ALLOWED_NAMESPACES || '';
+  const k8sAllowedNamespaces = allowedNamespacesRaw
+    ? allowedNamespacesRaw
+        .split(',')
+        .map((n) => n.trim())
+        .filter(Boolean)
+    : [];
+
   if (errors.length > 0) {
     throw new ConfigError(errors);
   }
@@ -71,6 +84,9 @@ export function getConfig(): AppConfig {
     nodeEnv: nodeEnvRaw ? (nodeEnvRaw as AppConfig['nodeEnv']) : 'development',
     gitHubToken,
     gitHubAllowedRepos,
+    k8sToken,
+    k8sApiServerUrl,
+    k8sAllowedNamespaces,
   };
 }
 
