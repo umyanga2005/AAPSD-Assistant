@@ -26,6 +26,30 @@ npm run format
 npm run typecheck
 ```
 
+## API
+
+```bash
+# Start the API (production build)
+cd apps/api && npm run build && npm run start
+
+# Development mode with hot reload
+cd apps/api && npm run dev
+
+# Test the endpoints
+curl http://localhost:3000/health
+curl http://localhost:3000/ready
+```
+
+The `PORT` environment variable configures the listen port (default: `3000`).
+
+## Tests
+
+```bash
+# Run all tests
+npm run test --workspace=@aapsd/api
+npm run test --workspace=@aapsd/diagnosis
+```
+
 ## Pre-commit Hooks
 
 This project uses [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged). After `npm install`, hooks are automatically configured via the `prepare` script.
