@@ -67,6 +67,30 @@ npm run test --workspace=@aapsd/web
 npm run test --workspace=@aapsd/diagnosis
 ```
 
+## Docker (PostgreSQL + Redis)
+
+```bash
+# Start services
+docker compose -f infra/docker/compose.yaml --env-file infra/docker/.env up -d
+
+# View logs
+docker compose -f infra/docker/compose.yaml logs -f
+
+# Stop services
+docker compose -f infra/docker/compose.yaml down
+
+# Stop and delete volumes (resets all data)
+docker compose -f infra/docker/compose.yaml down -v
+```
+
+Default credentials are in `infra/docker/.env.example`. Copy it to `infra/docker/.env` to customise:
+
+```bash
+cp infra/docker/.env.example infra/docker/.env
+```
+
+The `.env` file is gitignored — never commit secrets.
+
 ## Pre-commit Hooks
 
 This project uses [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged). After `npm install`, hooks are automatically configured via the `prepare` script.
