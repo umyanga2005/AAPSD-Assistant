@@ -29,10 +29,13 @@ interface MetricData {
 }
 
 interface PipelineRun {
-  id?: string;
+  id?: string | number;
   name?: string;
   workflowName?: string;
   status?: string;
+  branch?: string;
+  createdAt?: string;
+  head_sha?: string;
 }
 
 interface DashboardState {
@@ -40,7 +43,7 @@ interface DashboardState {
     data: PipelineRun[];
   };
   infrastructure: {
-    deployments: Record<string, unknown>[];
+    deployments: { availableReplicas?: number; replicas?: number; [key: string]: unknown }[];
     pods: Record<string, unknown>[];
   };
   metrics: {
@@ -177,7 +180,7 @@ export default function Dashboard() {
 
   const healthyDeployments =
     state?.infrastructure?.deployments?.filter(
-      (d) => d.availableReplicas === d.replicas && d.replicas > 0,
+      (d) => d.availableReplicas === d.replicas && (d.replicas ?? 0) > 0,
     )?.length ?? 0;
   const totalDeployments = state?.infrastructure?.deployments?.length ?? 0;
   const runningPipelines =

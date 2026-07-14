@@ -101,7 +101,8 @@ export async function runDiagnosis(
   let modelResponse;
   try {
     modelResponse = await analyzeWithModel(prompt, provider);
-  } catch {
+  } catch (err: any) {
+    console.error('Model analysis failed:', err);
     return {
       requestId: request.traceId,
       summary: 'Analysis could not be completed due to a system error.',
@@ -144,9 +145,24 @@ function buildPrompt(
   evidence: Array<{ source: string; logs: string[]; metadata: Record<string, unknown> }>,
   runbook: unknown,
 ): string {
-  return JSON.stringify({
-    query: request.query,
-    evidence,
-    runbook,
-  });
+  const schema = {
+    summary: "string (1-2 sentences)",
+    evidence: [{ source: "string", title: "string", detail: "string", url: "optional string", timestamp: "optional string" }],
+    likely_causes: [{ description: "string", probability: "number 0-1" }],
+    recommendations: [{ action: "string", details: "string" }],
+    confidence: "high | medium | low | insufficient_evidence",
+    needs_human_review: "boolean"
+  };
+
+  return `You are a DevOps and infrastructure diagnosis AI.
+Analyze the following request and evidence, and return a JSON object matching this schema EXACTLY. Do not include any text outside the JSON object. Do not wrap it in markdown formatting like \`\`\`json.
+Schema:
+${JSON.stringify(schema, null, 2)}
+
+Request Details:
+${JSON.stringify({
+  query: request.query,
+  evidence,
+  runbook,
+}, null, 2)}`;
 }

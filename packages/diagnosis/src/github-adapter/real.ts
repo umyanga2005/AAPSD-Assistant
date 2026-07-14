@@ -75,7 +75,16 @@ export class RealGitHubAdapter implements GitHubAdapter {
 
     this.checkRepo(repo);
 
-    const jobs = await this.getJobs(repo, runId);
+    let jobs: Job[] = [];
+    try {
+      jobs = await this.getJobs(repo, runId);
+    } catch (err: any) {
+      return {
+        source: 'github',
+        logs: [],
+        metadata: { error: `Failed to fetch jobs: ${err?.message || String(err)}` },
+      };
+    }
     const failedJobs = jobs.filter((j) => j.conclusion === 'failure');
 
     const logs: string[] = [];
@@ -116,6 +125,7 @@ export class RealGitHubAdapter implements GitHubAdapter {
         status: string;
         conclusion: string | null;
         html_url: string;
+        head_sha: string;
         created_at: string;
         updated_at: string;
       }>;
@@ -127,6 +137,7 @@ export class RealGitHubAdapter implements GitHubAdapter {
       status: run.status as WorkflowRun['status'],
       conclusion: run.conclusion as WorkflowRun['conclusion'],
       url: run.html_url,
+      head_sha: run.head_sha,
       createdAt: run.created_at,
       updatedAt: run.updated_at,
     }));

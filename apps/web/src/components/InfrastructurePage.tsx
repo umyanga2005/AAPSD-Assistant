@@ -44,8 +44,7 @@ export default function InfrastructurePage() {
         setViewState('success');
       } catch {
         if (cancelled) return;
-        setData({ deployments: [], pods: [] });
-        setViewState('success');
+        setViewState('error');
       }
     }
 
@@ -194,12 +193,12 @@ export default function InfrastructurePage() {
                       <td className="p-4">
                         <span
                           className={`px-2.5 py-1 text-xs font-bold rounded-md border ${
-                            pod.status.toLowerCase() === 'running'
+                            pod.status?.toLowerCase() === 'running'
                               ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
                               : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30'
                           }`}
                         >
-                          {pod.status}
+                          {pod.status || 'Unknown'}
                         </span>
                       </td>
                       <td className="p-4">

@@ -34,10 +34,10 @@ describe('FakeModelProvider', () => {
 
 describe('OpenRouterModelProvider', () => {
   it('throws when no API key is configured', () => {
-    const key = process.env.OPENROUTER_API_KEY;
-    vi.stubEnv('OPENROUTER_API_KEY', '');
+    const key = process.env.GROQ_API_KEY;
+    vi.stubEnv('GROQ_API_KEY', '');
     expect(() => new OpenRouterModelProvider()).toThrow(
-      'OPENROUTER_API_KEY environment variable is required',
+      'GROQ_API_KEY environment variable is required',
     );
     vi.unstubAllEnvs();
   });

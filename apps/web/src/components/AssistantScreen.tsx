@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import type { DiagnosisResult } from '@aapsd/contracts';
 
 type ViewState = 'form' | 'loading' | 'success' | 'error';
@@ -45,9 +45,16 @@ export default function AssistantScreen() {
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
   const devUserId = import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-0000-0000-000000000001';
   const devRole = import.meta.env.VITE_DEV_ROLE ?? 'viewer';
-  const devProjectId =
-    import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000002';
+  const devProjectId = import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000002';
   const devEnvId = import.meta.env.VITE_DEV_ENV_ID ?? '00000000-0000-0000-0000-000000000003';
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const runId = params.get('pipeline_run_id');
+    if (runId) {
+      setForm((prev) => ({ ...prev, pipelineRunId: runId, query: 'Why did this pipeline fail?' }));
+    }
+  }, []);
 
   function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -85,7 +92,7 @@ export default function AssistantScreen() {
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.error ?? `Request failed (${response.status})`);
+        throw new Error(errBody.details ?? errBody.error ?? `Request failed (${response.status})`);
       }
 
       const data = (await response.json()) as DiagnosisResult;

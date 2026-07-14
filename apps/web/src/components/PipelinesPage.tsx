@@ -12,25 +12,35 @@ interface PipelineRun {
 }
 
 interface ApiPipelineRun {
-  id: string;
-  workflow_name: string;
-  status: string;
-  branch: string;
-  commit_sha: string;
-  duration: string;
-  triggered_at: string;
-  failed_jobs: { name: string; step: string; exit_code: number }[];
+  id: string | number;
+  workflow_name?: string;
+  name?: string;
+  status?: string;
+  conclusion?: string;
+  branch?: string;
+  commit_sha?: string;
+  head_sha?: string;
+  duration?: string;
+  triggered_at?: string;
+  createdAt?: string;
+  failed_jobs?: { name: string; step: string; exit_code: number }[];
 }
 
 function normalizeRun(raw: ApiPipelineRun): PipelineRun {
+  let normalizedStatus = raw.status;
+  if (raw.status === 'completed' && raw.conclusion) {
+    normalizedStatus = raw.conclusion;
+  }
+  if (normalizedStatus === 'failure') normalizedStatus = 'failed';
+
   return {
-    id: raw.id,
-    workflowName: raw.workflow_name,
-    status: raw.status as PipelineRun['status'],
-    branch: raw.branch,
-    commitSha: raw.commit_sha,
-    duration: raw.duration,
-    triggeredAt: raw.triggered_at,
+    id: String(raw.id),
+    workflowName: raw.workflow_name || raw.name || 'Unknown Workflow',
+    status: (normalizedStatus || 'pending') as PipelineRun['status'],
+    branch: raw.branch || 'main',
+    commitSha: raw.commit_sha || raw.head_sha || '0000000',
+    duration: raw.duration || '0s',
+    triggeredAt: raw.triggered_at || raw.createdAt || new Date().toISOString(),
     failedJobs: (raw.failed_jobs ?? []).map((j) => ({
       name: j.name,
       step: j.step,

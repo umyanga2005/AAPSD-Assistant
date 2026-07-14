@@ -18,30 +18,36 @@ describe('PipelinesPage', () => {
     expect(screen.getByText('Loading pipeline runs...')).toBeInTheDocument();
   });
 
-  it('falls back to mock data when API call fails', async () => {
+  it('shows error state when API call fails', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
     render(<PipelinesPage />);
 
     expect(await screen.findByText('Pipelines')).toBeInTheDocument();
-    expect(await screen.findByText(/Showing demo data/)).toBeInTheDocument();
-    expect((await screen.findAllByText(/Deploy to Staging/)).length).toBe(2);
-    expect(await screen.findByText('CI Checks')).toBeInTheDocument();
+    expect(await screen.findByText(/No pipeline runs found/)).toBeInTheDocument();
   });
 
+  const mockData = [
+    { id: '1', name: 'Deploy to Staging', status: 'failed', conclusion: 'failure', failed_jobs: [{ name: 'Build', step: 'Pull image', exit_code: 1 }] },
+    { id: '2', name: 'Deploy to Staging', status: 'completed', conclusion: 'success' },
+    { id: '3', name: 'CI Checks', status: 'completed', conclusion: 'success' },
+    { id: '4', name: 'Nightly', status: 'in_progress' },
+    { id: '5', name: 'Linter', status: 'queued' }
+  ];
+
   it('renders pipeline status badges', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
 
     render(<PipelinesPage />);
 
     expect(await screen.findByText('Failed')).toBeInTheDocument();
     expect((await screen.findAllByText('Success')).length).toBe(2);
-    expect(await screen.findByText('Running')).toBeInTheDocument();
-    expect(await screen.findByText('Pending')).toBeInTheDocument();
+    expect(await screen.findByText('In_progress')).toBeInTheDocument();
+    expect(await screen.findByText('Queued')).toBeInTheDocument();
   });
 
   it('renders failed job summaries', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
 
     render(<PipelinesPage />);
 
@@ -50,7 +56,7 @@ describe('PipelinesPage', () => {
   });
 
   it('renders diagnosis links', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
 
     render(<PipelinesPage />);
 

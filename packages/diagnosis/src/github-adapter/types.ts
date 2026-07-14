@@ -6,6 +6,7 @@ export interface WorkflowRun {
   status: 'completed' | 'in_progress' | 'queued' | 'cancelled';
   conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | null;
   url: string;
+  head_sha: string;
   createdAt: string;
   updatedAt: string;
 }

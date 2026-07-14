@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header.js';
 import Sidebar from './components/Sidebar.js';
 import AssistantScreen from './components/AssistantScreen.js';
@@ -34,10 +34,24 @@ const PAGES: Record<string, { title: string; description: string }> = {
   },
 };
 
+const getInitialPage = () => {
+  const path = window.location.pathname.replace(/^\//, '');
+  if (PAGES[path]) return path;
+  return 'dashboard';
+};
+
 export default function App() {
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState(getInitialPage());
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const current = PAGES[page];
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPage(getInitialPage());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   return (
     <div className="flex h-screen w-full bg-brand-dark overflow-hidden">
@@ -54,6 +68,7 @@ export default function App() {
         pages={PAGES}
         active={page}
         onNavigate={(p) => {
+          window.history.pushState(null, '', `/${p}`);
           setPage(p);
           setIsSidebarOpen(false);
         }}
