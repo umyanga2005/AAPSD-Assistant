@@ -9,7 +9,6 @@ export type {
   ContainerStatus,
 } from './types.js';
 export type { K8sConfig } from './config.js';
-export { MockK8sAdapter } from './mock.js';
 export { RealK8sAdapter, K8sApiError } from './real.js';
 
 let currentAdapter: K8sAdapter | null = null;

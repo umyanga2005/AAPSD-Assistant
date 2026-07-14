@@ -22,79 +22,11 @@ interface InfrastructureData {
   pods: PodInfo[];
 }
 
-const MOCK_DATA: InfrastructureData = {
-  deployments: [
-    { name: 'api', namespace: 'staging', desired: 3, available: 3, status: 'healthy' },
-    { name: 'web', namespace: 'staging', desired: 2, available: 2, status: 'healthy' },
-    { name: 'worker', namespace: 'staging', desired: 1, available: 0, status: 'degraded' },
-    { name: 'cache', namespace: 'staging', desired: 1, available: 1, status: 'healthy' },
-  ],
-  pods: [
-    {
-      name: 'api-5d8f7c9b6c-a1b2c',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 0,
-      cpu: '120m',
-      memory: '256Mi',
-    },
-    {
-      name: 'api-5d8f7c9b6c-d3e4f',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 1,
-      cpu: '95m',
-      memory: '210Mi',
-    },
-    {
-      name: 'api-5d8f7c9b6c-g5h6i',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 0,
-      cpu: '110m',
-      memory: '240Mi',
-    },
-    {
-      name: 'web-2a3b4c5d6e-j7k8l',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 0,
-      cpu: '45m',
-      memory: '128Mi',
-    },
-    {
-      name: 'web-2a3b4c5d6e-m9n0o',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 2,
-      cpu: '50m',
-      memory: '132Mi',
-    },
-    {
-      name: 'worker-1p2q3r4s5t-u6v7w',
-      namespace: 'staging',
-      status: 'CrashLoopBackOff',
-      restarts: 8,
-      cpu: '10m',
-      memory: '64Mi',
-    },
-    {
-      name: 'cache-8x9y0z1a2b-c3d4e',
-      namespace: 'staging',
-      status: 'Running',
-      restarts: 0,
-      cpu: '30m',
-      memory: '96Mi',
-    },
-  ],
-};
-
 type ViewState = 'loading' | 'success' | 'error';
 
 export default function InfrastructurePage() {
   const [viewState, setViewState] = useState<ViewState>('loading');
   const [data, setData] = useState<InfrastructureData | null>(null);
-  const [isMockData, setIsMockData] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -112,8 +44,7 @@ export default function InfrastructurePage() {
         setViewState('success');
       } catch {
         if (cancelled) return;
-        setData(MOCK_DATA);
-        setIsMockData(true);
+        setData({ deployments: [], pods: [] });
         setViewState('success');
       }
     }
@@ -142,20 +73,6 @@ export default function InfrastructurePage() {
             Cluster state, pod status, and resource metrics.
           </p>
         </div>
-
-        {isMockData && (
-          <div className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-lg text-sm font-medium flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            Showing demo data
-          </div>
-        )}
       </div>
 
       {viewState === 'loading' && (

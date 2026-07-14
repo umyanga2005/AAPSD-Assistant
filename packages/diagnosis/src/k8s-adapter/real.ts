@@ -156,6 +156,54 @@ export class RealK8sAdapter implements K8sAdapter {
     };
   }
 
+  async getPods(namespace: string): Promise<Pod[]> {
+    this.checkNamespace(namespace);
+    const data = await this.request<{
+      items: Array<{
+        metadata: { name: string; namespace: string; creationTimestamp: string };
+        status: {
+          phase: string;
+          conditions?: Array<{ type: string; status: string }>;
+          containerStatuses?: Array<{
+            name: string;
+            ready: boolean;
+            restartCount: number;
+            state: Record<string, Record<string, unknown>>;
+            started?: boolean;
+          }>;
+          hostIP?: string;
+          podIP?: string;
+        };
+        spec?: { nodeName?: string };
+      }>;
+    }>(`/api/v1/namespaces/${namespace}/pods`);
+
+    return data.items.map((item) => {
+      const statusCondition =
+        item.status.conditions?.find((c) => c.type === 'Ready')?.status ?? 'Unknown';
+
+      return {
+        name: item.metadata.name,
+        namespace: item.metadata.namespace,
+        phase: item.status.phase as PodPhase,
+        status: statusCondition as PodStatus,
+        containers: (item.status.containerStatuses ?? []).map((cs) => {
+          const stateKey = Object.keys(cs.state)[0] ?? 'unknown';
+          return {
+            name: cs.name,
+            ready: cs.ready,
+            restartCount: cs.restartCount,
+            state: `${stateKey}: ${JSON.stringify(cs.state[stateKey])}`,
+            started: cs.started,
+          };
+        }),
+        nodeName: item.spec?.nodeName ?? item.status.hostIP,
+        podIP: item.status.podIP,
+        createdAt: item.metadata.creationTimestamp,
+      };
+    });
+  }
+
   async getEvents(namespace: string, podName?: string): Promise<Event[]> {
     this.checkNamespace(namespace);
     const fieldSelector = podName ? `?fieldSelector=involvedObject.name=${podName}` : '';

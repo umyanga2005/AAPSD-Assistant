@@ -49,6 +49,7 @@ export interface Deployment {
 export interface K8sAdapter {
   collectEvidence(podName?: string, namespace?: string): Promise<CollectedEvidence>;
   getPodStatus(namespace: string, podName: string): Promise<Pod>;
+  getPods(namespace: string): Promise<Pod[]>;
   getEvents(namespace: string, podName?: string): Promise<Event[]>;
   getPodLogs(namespace: string, podName: string, tailLines?: number): Promise<string[]>;
   getDeployments(namespace: string): Promise<Deployment[]>;

@@ -1,7 +1,6 @@
 import type { GitHubAdapter } from './types.js';
 export type { GitHubAdapter, WorkflowRun, Job, Step } from './types.js';
 export type { GitHubConfig } from './config.js';
-export { MockGitHubAdapter } from './mock.js';
 export { RealGitHubAdapter, GitHubApiError } from './real.js';
 
 let currentAdapter: GitHubAdapter | null = null;

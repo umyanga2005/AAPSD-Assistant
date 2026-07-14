@@ -22,59 +22,6 @@ interface ApiPipelineRun {
   failed_jobs: { name: string; step: string; exit_code: number }[];
 }
 
-const MOCK_PIPELINES: PipelineRun[] = [
-  {
-    id: 'run-9876',
-    workflowName: 'Deploy to Staging',
-    status: 'failed',
-    branch: 'main',
-    commitSha: 'a1b2c3d',
-    duration: '4m 12s',
-    triggeredAt: '2025-07-13T10:32:00Z',
-    failedJobs: [{ name: 'Deploy', step: 'Pull image', exitCode: 1 }],
-  },
-  {
-    id: 'run-9875',
-    workflowName: 'CI Checks',
-    status: 'success',
-    branch: 'feature/add-auth',
-    commitSha: 'e4f5g6h',
-    duration: '2m 48s',
-    triggeredAt: '2025-07-13T09:15:00Z',
-    failedJobs: [],
-  },
-  {
-    id: 'run-9874',
-    workflowName: 'Deploy to Staging',
-    status: 'success',
-    branch: 'main',
-    commitSha: 'i7j8k9l',
-    duration: '3m 55s',
-    triggeredAt: '2025-07-13T08:00:00Z',
-    failedJobs: [],
-  },
-  {
-    id: 'run-9873',
-    workflowName: 'Integration Tests',
-    status: 'running',
-    branch: 'fix/timeout',
-    commitSha: 'm0n1o2p',
-    duration: '1m 30s',
-    triggeredAt: '2025-07-13T11:00:00Z',
-    failedJobs: [],
-  },
-  {
-    id: 'run-9872',
-    workflowName: 'Lint & Format',
-    status: 'pending',
-    branch: 'docs/api-ref',
-    commitSha: 'q3r4s5t',
-    duration: '—',
-    triggeredAt: '2025-07-13T11:05:00Z',
-    failedJobs: [],
-  },
-];
-
 function normalizeRun(raw: ApiPipelineRun): PipelineRun {
   return {
     id: raw.id,
@@ -115,7 +62,6 @@ type ViewState = 'loading' | 'success' | 'error';
 export default function PipelinesPage() {
   const [viewState, setViewState] = useState<ViewState>('loading');
   const [pipelines, setPipelines] = useState<PipelineRun[]>([]);
-  const [isMockData, setIsMockData] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -134,8 +80,7 @@ export default function PipelinesPage() {
         setViewState('success');
       } catch {
         if (cancelled) return;
-        setPipelines(MOCK_PIPELINES);
-        setIsMockData(true);
+        setPipelines([]);
         setViewState('success');
       }
     }
@@ -173,20 +118,6 @@ export default function PipelinesPage() {
             Workflow runs, status, duration, and failed job summaries.
           </p>
         </div>
-
-        {isMockData && (
-          <div className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-lg text-sm font-medium flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            Showing demo data
-          </div>
-        )}
       </div>
 
       {viewState === 'loading' && (

@@ -18,6 +18,8 @@
   "dependencies": {
     "@aapsd/contracts": "*",
     "@aapsd/diagnosis": "*",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/websocket": "^11.3.0",
     "drizzle-orm": "^0.38.0",
     "fastify": "^5.0.0",
     "pg": "^8.13.0"

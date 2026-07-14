@@ -6,6 +6,8 @@ import Fastify, {
   type FastifyRequest,
   type FastifyReply,
 } from 'fastify';
+import fastifyWebsocket from '@fastify/websocket';
+import fastifyCors from '@fastify/cors';
 import { getConfig, getConfigSafe, ConfigError } from './config.js';
 import { getDb } from './db/index.js';
 import { requests } from './db/schema.js';
@@ -18,14 +20,14 @@ import {
   FakeModelProvider,
   OpenRouterModelProvider,
   RealGitHubAdapter,
-  MockGitHubAdapter,
   setGitHubAdapter,
+  getGitHubAdapter,
   RealK8sAdapter,
-  MockK8sAdapter,
   setK8sAdapter,
+  getK8sAdapter,
   RealPrometheusAdapter,
-  MockPrometheusAdapter,
   setPrometheusAdapter,
+  getPrometheusAdapter,
   ALL_METRICS,
   type ModelProvider,
 } from '@aapsd/diagnosis';
@@ -39,50 +41,46 @@ function createModelProvider(): ModelProvider {
   return new FakeModelProvider();
 }
 
-export function buildApp(): FastifyInstance {
+export async function buildApp(): Promise<FastifyInstance> {
   const modelProvider = createModelProvider();
   const config = getConfigSafe();
   if ('_errors' in config) {
-    console.warn('Config errors, skipping adapter setup:', config._errors);
-  } else {
-    if (config.gitHubToken) {
-      const ghAdapter = new RealGitHubAdapter({
-        token: config.gitHubToken,
-        allowedRepos: config.gitHubAllowedRepos,
-      });
-      setGitHubAdapter(ghAdapter);
-    } else {
-      setGitHubAdapter(new MockGitHubAdapter());
-    }
-
-    if (config.k8sToken) {
-      const k8sAdapter = new RealK8sAdapter({
-        token: config.k8sToken,
-        apiServerUrl: config.k8sApiServerUrl,
-        allowedNamespaces: config.k8sAllowedNamespaces,
-      });
-      setK8sAdapter(k8sAdapter);
-    } else {
-      setK8sAdapter(new MockK8sAdapter());
-    }
-
-    if (config.prometheusBaseUrl) {
-      const promAdapter = new RealPrometheusAdapter({
-        baseUrl: config.prometheusBaseUrl,
-        allowedMetrics:
-          config.prometheusAllowedMetrics.length > 0
-            ? config.prometheusAllowedMetrics
-            : ALL_METRICS,
-      });
-      setPrometheusAdapter(promAdapter);
-    } else {
-      setPrometheusAdapter(new MockPrometheusAdapter());
-    }
+    console.warn('Config errors, proceeding with default real adapters:', config._errors);
   }
+
+  // Always use real adapters, providing dummy config if missing to prevent startup crash
+  // Actual API calls will fail gracefully in the route handlers
+  const ghAdapter = new RealGitHubAdapter({
+    token: ('gitHubToken' in config ? config.gitHubToken : '') || 'dummy_token',
+    allowedRepos: 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [],
+  });
+  setGitHubAdapter(ghAdapter);
+
+  const k8sAdapter = new RealK8sAdapter({
+    token: ('k8sToken' in config ? config.k8sToken : '') || 'dummy_token',
+    apiServerUrl: ('k8sApiServerUrl' in config ? config.k8sApiServerUrl : '') || 'http://localhost',
+    allowedNamespaces: 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [],
+  });
+  setK8sAdapter(k8sAdapter);
+
+  const promAdapter = new RealPrometheusAdapter({
+    baseUrl: ('prometheusBaseUrl' in config ? config.prometheusBaseUrl : '') || 'http://localhost',
+    allowedMetrics:
+      'prometheusAllowedMetrics' in config && config.prometheusAllowedMetrics.length > 0
+        ? config.prometheusAllowedMetrics
+        : ALL_METRICS,
+  });
+  setPrometheusAdapter(promAdapter);
 
   const app = Fastify({
     logger: true,
   });
+
+  await app.register(fastifyCors, {
+    origin: '*', // Allow all origins for dev/dashboard, or configure properly
+  });
+
+  await app.register(fastifyWebsocket);
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     app.log.error(error);
@@ -157,6 +155,98 @@ export function buildApp(): FastifyInstance {
       }
     };
   };
+
+  app.get('/api/pipelines', async () => {
+    const gh = getGitHubAdapter();
+    if (!gh) return { data: [] };
+    try {
+      const config = getConfigSafe();
+      const repo =
+        !('_errors' in config) && config.gitHubAllowedRepos[0]
+          ? config.gitHubAllowedRepos[0]
+          : 'umyanga2005/AAPSD-Assistant';
+      const runs = await gh.getWorkflowRuns(repo, 10);
+      return { data: runs };
+    } catch {
+      return { data: [] }; // Fallback to empty if it fails (as requested)
+    }
+  });
+
+  app.get('/api/infrastructure', async () => {
+    const k8s = getK8sAdapter();
+    if (!k8s) return { deployments: [], pods: [] };
+    try {
+      const [deployments, pods] = await Promise.all([
+        k8s.getDeployments('default'),
+        k8s.getPods('default'),
+      ]);
+      return { deployments, pods };
+    } catch {
+      return { deployments: [], pods: [] }; // Fallback to empty if it fails
+    }
+  });
+
+  app.route({
+    method: 'GET',
+    url: '/api/ws/dashboard',
+    handler: (req, reply) => {
+      reply.status(400).send({ error: 'WebSocket connection required' });
+    },
+    wsHandler: (connection, _req) => {
+      const sendUpdates = async () => {
+        try {
+          const gh = getGitHubAdapter();
+          const k8s = getK8sAdapter();
+          const prom = getPrometheusAdapter();
+
+          const pipelines: { data: unknown[] } = { data: [] };
+          if (gh) {
+            const repo =
+              !('_errors' in config) && config.gitHubAllowedRepos[0]
+                ? config.gitHubAllowedRepos[0]
+                : 'umyanga2005/AAPSD-Assistant';
+            pipelines.data = await gh.getWorkflowRuns(repo, 10).catch(() => []);
+          }
+
+          let infrastructure: { deployments: unknown[]; pods: unknown[] } = {
+            deployments: [],
+            pods: [],
+          };
+          if (k8s) {
+            const [deployments, pods] = await Promise.all([
+              k8s.getDeployments('default').catch(() => []),
+              k8s.getPods('default').catch(() => []),
+            ]);
+            infrastructure = { deployments, pods };
+          }
+
+          let metrics: { cpu: unknown; memory: unknown } = { cpu: null, memory: null };
+          if (prom) {
+            const [cpu, memory] = await Promise.all([
+              prom.query('cpu').catch(() => null),
+              prom.query('memory').catch(() => null),
+            ]);
+            metrics = { cpu, memory };
+          }
+
+          connection.send(
+            JSON.stringify({ type: 'update', payload: { pipelines, infrastructure, metrics } }),
+          );
+        } catch (err) {
+          app.log.error(err);
+        }
+      };
+
+      // Send initial update immediately
+      sendUpdates();
+      // Poll every 5 seconds
+      const timer = setInterval(sendUpdates, 5000);
+
+      connection.on('close', () => {
+        clearInterval(timer);
+      });
+    },
+  });
 
   app.get('/health', async () => {
     return {
@@ -294,7 +384,65 @@ async function start(): Promise<void> {
     throw err;
   }
 
-  const app = buildApp();
+  const app = await buildApp();
+
+  console.log('\n--- System Environment Checks ---');
+
+  // Database Check
+  try {
+    await testConnection();
+    console.log('✅ Database: Connected successfully');
+  } catch (err) {
+    console.log(
+      `❌ Database: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // GitHub Check
+  const gh = getGitHubAdapter();
+  if (gh) {
+    try {
+      const repo =
+        !('_errors' in config) && config.gitHubAllowedRepos[0]
+          ? config.gitHubAllowedRepos[0]
+          : 'umyanga2005/AAPSD-Assistant';
+      await gh.getWorkflowRuns(repo, 1);
+      console.log('✅ GitHub Adapter: Connected successfully');
+    } catch (err) {
+      console.log(
+        `❌ GitHub Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // Kubernetes Check
+  const k8s = getK8sAdapter();
+  if (k8s) {
+    try {
+      await k8s.getPods('default');
+      console.log('✅ Kubernetes Adapter: Connected successfully');
+    } catch (err) {
+      console.log(
+        `❌ Kubernetes Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // Prometheus Check
+  const prom = getPrometheusAdapter();
+  if (prom) {
+    try {
+      await prom.query('cpu');
+      console.log('✅ Prometheus Adapter: Connected successfully');
+    } catch (err) {
+      console.log(
+        `❌ Prometheus Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  console.log('--- Environment Checks Complete ---\n');
+  console.log('Connected and can continue other logs inside terminal\n');
 
   try {
     await app.listen({ port: config.port, host: '0.0.0.0' });

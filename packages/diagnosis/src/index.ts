@@ -17,7 +17,6 @@ export { FakeModelProvider, OpenRouterModelProvider } from './model-provider/ind
 export {
   setGitHubAdapter,
   getGitHubAdapter,
-  MockGitHubAdapter,
   RealGitHubAdapter,
   GitHubApiError,
 } from './github-adapter/index.js';
@@ -28,18 +27,11 @@ export type {
   Job,
   Step,
 } from './github-adapter/index.js';
-export {
-  setK8sAdapter,
-  getK8sAdapter,
-  MockK8sAdapter,
-  RealK8sAdapter,
-  K8sApiError,
-} from './k8s-adapter/index.js';
+export { setK8sAdapter, getK8sAdapter, RealK8sAdapter, K8sApiError } from './k8s-adapter/index.js';
 export type { K8sAdapter, K8sConfig, Pod, Event, Deployment } from './k8s-adapter/index.js';
 export {
   setPrometheusAdapter,
   getPrometheusAdapter,
-  MockPrometheusAdapter,
   RealPrometheusAdapter,
   PrometheusApiError,
   TimeoutError,
