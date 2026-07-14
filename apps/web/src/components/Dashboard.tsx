@@ -180,7 +180,7 @@ export default function Dashboard() {
 
   const healthyDeployments =
     state?.infrastructure?.deployments?.filter(
-      (d) => d.availableReplicas === d.replicas && (d.replicas ?? 0) > 0,
+      (d) => (d.availableReplicas ?? 0) >= (d.replicas ?? 0) && (d.replicas ?? 0) > 0,
     )?.length ?? 0;
   const totalDeployments = state?.infrastructure?.deployments?.length ?? 0;
   const runningPipelines =

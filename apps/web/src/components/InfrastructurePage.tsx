@@ -3,18 +3,32 @@ import { useEffect, useState } from 'react';
 interface Deployment {
   name: string;
   namespace: string;
-  desired: number;
-  available: number;
-  status: string;
+  replicas: number;
+  availableReplicas: number;
+  readyReplicas?: number;
+  updatedReplicas?: number;
+  strategy?: string;
+  conditions?: string[];
+  createdAt?: string;
+}
+
+interface ContainerStatus {
+  name: string;
+  ready: boolean;
+  restartCount: number;
+  state: string;
+  started?: boolean;
 }
 
 interface PodInfo {
   name: string;
   namespace: string;
+  phase: string;
   status: string;
-  restarts: number;
-  cpu: string;
-  memory: string;
+  containers: ContainerStatus[];
+  nodeName?: string;
+  podIP?: string;
+  createdAt?: string;
 }
 
 interface InfrastructureData {
@@ -54,9 +68,16 @@ export default function InfrastructurePage() {
     };
   }, [apiUrl]);
 
-  const totalRestarts = data?.pods.reduce((sum, p) => sum + p.restarts, 0) ?? 0;
-  const healthyDeployments = data?.deployments.filter((d) => d.status === 'healthy').length ?? 0;
-  const unHealthyPods = data?.pods.filter((p) => p.status !== 'Running').length ?? 0;
+  const totalRestarts =
+    data?.pods.reduce(
+      (sum, p) => sum + (p.containers?.reduce((cSum, c) => cSum + (c.restartCount || 0), 0) || 0),
+      0,
+    ) ?? 0;
+  const healthyDeployments =
+    data?.deployments.filter((d) => d.availableReplicas >= d.replicas && d.replicas > 0).length ??
+    0;
+  const unHealthyPods =
+    data?.pods.filter((p) => p.phase !== 'Running' && p.phase !== 'Succeeded').length ?? 0;
 
   return (
     <div className="max-w-6xl mx-auto animate-slide-in space-y-8">
@@ -145,25 +166,31 @@ export default function InfrastructurePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/50 text-sm">
-                  {data.deployments.map((dep) => (
-                    <tr key={dep.name} className="hover:bg-brand-surfaceHover/30 transition-colors">
-                      <td className="p-4 font-medium text-white">{dep.name}</td>
-                      <td className="p-4 text-brand-muted">{dep.namespace}</td>
-                      <td className="p-4 text-brand-text">{dep.desired}</td>
-                      <td className="p-4 text-brand-text">{dep.available}</td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2.5 py-1 text-xs font-bold rounded-md border ${
-                            dep.status === 'healthy'
-                              ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
-                              : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30'
-                          }`}
-                        >
-                          {dep.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {data.deployments.map((dep) => {
+                    const isHealthy = dep.availableReplicas >= dep.replicas && dep.replicas > 0;
+                    return (
+                      <tr
+                        key={dep.name}
+                        className="hover:bg-brand-surfaceHover/30 transition-colors"
+                      >
+                        <td className="p-4 font-medium text-white">{dep.name}</td>
+                        <td className="p-4 text-brand-muted">{dep.namespace}</td>
+                        <td className="p-4 text-brand-text">{dep.replicas}</td>
+                        <td className="p-4 text-brand-text">{dep.availableReplicas}</td>
+                        <td className="p-4">
+                          <span
+                            className={`px-2.5 py-1 text-xs font-bold rounded-md border ${
+                              isHealthy
+                                ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
+                                : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30'
+                            }`}
+                          >
+                            {isHealthy ? 'healthy' : 'degraded'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -186,34 +213,41 @@ export default function InfrastructurePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-border/50 text-sm">
-                  {data.pods.map((pod) => (
-                    <tr key={pod.name} className="hover:bg-brand-surfaceHover/30 transition-colors">
-                      <td className="p-4 font-medium text-white font-mono text-xs">{pod.name}</td>
-                      <td className="p-4 text-brand-muted">{pod.namespace}</td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2.5 py-1 text-xs font-bold rounded-md border ${
-                            pod.status?.toLowerCase() === 'running'
-                              ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
-                              : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30'
-                          }`}
-                        >
-                          {pod.status || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={
-                            pod.restarts > 0 ? 'text-yellow-500 font-bold' : 'text-brand-muted'
-                          }
-                        >
-                          {pod.restarts}
-                        </span>
-                      </td>
-                      <td className="p-4 text-brand-primary">{pod.cpu}</td>
-                      <td className="p-4 text-brand-primary">{pod.memory}</td>
-                    </tr>
-                  ))}
+                  {data.pods.map((pod) => {
+                    const restarts =
+                      pod.containers?.reduce((cSum, c) => cSum + (c.restartCount || 0), 0) || 0;
+                    return (
+                      <tr
+                        key={pod.name}
+                        className="hover:bg-brand-surfaceHover/30 transition-colors"
+                      >
+                        <td className="p-4 font-medium text-white font-mono text-xs">{pod.name}</td>
+                        <td className="p-4 text-brand-muted">{pod.namespace}</td>
+                        <td className="p-4">
+                          <span
+                            className={`px-2.5 py-1 text-xs font-bold rounded-md border ${
+                              pod.phase === 'Running' || pod.phase === 'Succeeded'
+                                ? 'bg-brand-success/10 text-brand-success border-brand-success/30'
+                                : 'bg-brand-danger/10 text-brand-danger border-brand-danger/30'
+                            }`}
+                          >
+                            {pod.phase || 'Unknown'}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={
+                              restarts > 0 ? 'text-yellow-500 font-bold' : 'text-brand-muted'
+                            }
+                          >
+                            {restarts}
+                          </span>
+                        </td>
+                        <td className="p-4 text-brand-primary/50 text-xs italic">N/A</td>
+                        <td className="p-4 text-brand-primary/50 text-xs italic">N/A</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
