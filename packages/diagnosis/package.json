@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@aapsd/contracts": "*",
-    "@aapsd/policy": "*"
+    "@aapsd/policy": "*",
+    "undici": "^8.7.0"
   },
   "devDependencies": {
     "vitest": "^2.0.0"

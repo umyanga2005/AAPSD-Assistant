@@ -2,6 +2,7 @@ import type { CollectedEvidence } from '@aapsd/contracts';
 import type { K8sAdapter, Pod, Event, Deployment, PodPhase, PodStatus } from './types.js';
 import type { K8sConfig } from './config.js';
 import { redactSecrets } from '../redactor.js';
+import { Agent } from 'undici';
 
 export class K8sApiError extends Error {
   constructor(
@@ -17,6 +18,7 @@ export class RealK8sAdapter implements K8sAdapter {
   private token: string;
   private apiServerUrl: string;
   private allowedNamespaces: string[];
+  private dispatcher: Agent;
 
   constructor(config: K8sConfig) {
     if (!config.token) {
@@ -25,6 +27,11 @@ export class RealK8sAdapter implements K8sAdapter {
     this.token = config.token;
     this.apiServerUrl = config.apiServerUrl ?? 'https://kubernetes.default.svc';
     this.allowedNamespaces = config.allowedNamespaces ?? [];
+    this.dispatcher = new Agent({
+      connect: {
+        rejectUnauthorized: false,
+      },
+    });
   }
 
   private checkNamespace(namespace: string): void {
@@ -41,7 +48,8 @@ export class RealK8sAdapter implements K8sAdapter {
         Accept: 'application/json',
         'User-Agent': 'aapsd-diagnosis',
       },
-    });
+      dispatcher: this.dispatcher,
+    } as any);
 
     if (!response.ok) {
       throw new K8sApiError(response.status, `K8s API error: ${response.status} for ${path}`);
@@ -241,7 +249,8 @@ export class RealK8sAdapter implements K8sAdapter {
           Authorization: `Bearer ${this.token}`,
           'User-Agent': 'aapsd-diagnosis',
         },
-      },
+        dispatcher: this.dispatcher,
+      } as any,
     );
 
     if (!response.ok) {
