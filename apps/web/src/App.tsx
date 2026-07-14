@@ -5,6 +5,8 @@ import AssistantScreen from './components/AssistantScreen.js';
 import PipelinesPage from './components/PipelinesPage.js';
 import InfrastructurePage from './components/InfrastructurePage.js';
 import Dashboard from './components/Dashboard.js';
+import AuditLogsPage from './components/AuditLogsPage.js';
+import IncidentsPage from './components/IncidentsPage.js';
 import './App.css';
 
 const PAGES: Record<string, { title: string; description: string }> = {
@@ -88,6 +90,10 @@ export default function App() {
             <InfrastructurePage />
           ) : page === 'dashboard' ? (
             <Dashboard />
+          ) : page === 'incidents' ? (
+            <IncidentsPage />
+          ) : page === 'audit' ? (
+            <AuditLogsPage />
           ) : (
             <div className="animate-fade-in glass-panel rounded-xl p-8 max-w-4xl mx-auto mt-8 border-brand-primary/20">
               <h1 className="text-3xl font-bold text-white mb-2">{current.title}</h1>

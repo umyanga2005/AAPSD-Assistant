@@ -2,7 +2,7 @@ import type { CollectedEvidence } from '@aapsd/contracts';
 import type { K8sAdapter, Pod, Event, Deployment, PodPhase, PodStatus } from './types.js';
 import type { K8sConfig } from './config.js';
 import { redactSecrets } from '../redactor.js';
-import { Agent } from 'undici';
+import { Agent, fetch } from 'undici';
 
 export class K8sApiError extends Error {
   constructor(
@@ -49,7 +49,7 @@ export class RealK8sAdapter implements K8sAdapter {
         'User-Agent': 'aapsd-diagnosis',
       },
       dispatcher: this.dispatcher,
-    } as any);
+    });
 
     if (!response.ok) {
       throw new K8sApiError(response.status, `K8s API error: ${response.status} for ${path}`);
@@ -250,7 +250,7 @@ export class RealK8sAdapter implements K8sAdapter {
           'User-Agent': 'aapsd-diagnosis',
         },
         dispatcher: this.dispatcher,
-      } as any,
+      },
     );
 
     if (!response.ok) {
