@@ -9,11 +9,12 @@ import Fastify, {
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyCors from '@fastify/cors';
 import { getConfig, getConfigSafe, ConfigError } from './config.js';
-import { getDb } from './db/index.js';
-import { requests } from './db/schema.js';
-import { testConnection } from './db/index.js';
+import { getDb, testConnection } from './db/index.js';
+import { requests, userIntegrations } from './db/schema.js';
+import { eq, and } from 'drizzle-orm';
+import authRoutes from './routes/auth.js';
 import { getAuditEventsByProject, recordAuditEvent } from './services/audit.js';
-import { resolveDevUser, getProjectRole, hasRole, isRole } from './services/auth.js';
+import { resolveDevUser, resolveFirebaseUser, getProjectRole, hasRole, isRole } from './services/auth.js';
 import { validateDiagnoseBody } from './services/validation.js';
 import {
   runDiagnosis,
@@ -92,24 +93,44 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   const devAuthPreHandler = async (request: FastifyRequest, reply: FastifyReply) => {
-    const devUserId = request.headers['x-dev-user-id'];
-    const devRole = request.headers['x-dev-role'] as string | undefined;
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Fallback to dev user header for local development bypass if no token
+      const devUserId = request.headers['x-dev-user-id'];
+      if (devUserId && typeof devUserId === 'string') {
+        const devRole = request.headers['x-dev-role'] as string | undefined;
+        const roleOverride = devRole && isRole(devRole) ? devRole : undefined;
+        try {
+          const user = await resolveDevUser(devUserId, roleOverride);
+          (request as unknown as Record<string, unknown>).user = user;
+          return;
+        } catch {
+          // ignore dev bypass error and fall through
+        }
+      }
 
-    if (!devUserId || typeof devUserId !== 'string') {
       return reply.status(401).send({
-        error: 'Unauthorized — provide X-Dev-User-Id header (temporary dev auth)',
+        error: 'Unauthorized — provide Authorization header with Firebase token',
         statusCode: 401,
       });
     }
 
-    const roleOverride = devRole && isRole(devRole) ? devRole : undefined;
+    const token = authHeader.split(' ')[1];
 
     try {
-      const user = await resolveDevUser(devUserId, roleOverride);
+      // dynamically import firebaseAuth so we don't crash if env isn't fully set
+      const { firebaseAuth } = await import('./services/firebase.js');
+      const decodedToken = await firebaseAuth.verifyIdToken(token);
+      
+      const email = decodedToken.email || '';
+      const name = decodedToken.name || email.split('@')[0] || 'Unknown User';
+
+      const user = await resolveFirebaseUser(email, name);
       (request as unknown as Record<string, unknown>).user = user;
-    } catch {
+    } catch (err) {
+      console.error('Firebase Auth Error:', err);
       return reply.status(401).send({
-        error: 'Unauthorized — could not resolve user',
+        error: 'Unauthorized — invalid or expired token',
         statusCode: 401,
       });
     }
@@ -149,16 +170,30 @@ export async function buildApp(): Promise<FastifyInstance> {
         }).catch(() => {});
 
         return reply.status(403).send({
-          error: 'Forbidden — insufficient permissions for this project',
+          error: 'Forbidden — insufficient project role',
           statusCode: 403,
         });
       }
     };
   };
 
-  app.get('/api/pipelines', async () => {
-    const gh = getGitHubAdapter();
-    if (!gh) return { data: [] };
+  await app.register(authRoutes, { prefix: '/', devAuthPreHandler });
+
+  app.get('/api/pipelines', { preHandler: [devAuthPreHandler] }, async (request, reply) => {
+    const user = (request as unknown as Record<string, unknown>).user as { id: string };
+    const db = getDb();
+    const integration = await db.select().from(userIntegrations)
+      .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github'))).limit(1);
+
+    if (integration.length === 0) {
+      return { data: [] }; // No GitHub integration connected
+    }
+
+    const gh = new RealGitHubAdapter({
+      token: integration[0].accessToken,
+      allowedRepos: [], // Allow all for this user token
+    });
+
     try {
       const config = getConfigSafe();
       const repo =
@@ -172,7 +207,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  app.get('/api/infrastructure', async () => {
+  app.get('/api/infrastructure', { preHandler: [devAuthPreHandler] }, async () => {
     const k8s = getK8sAdapter();
     if (!k8s) return { deployments: [], pods: [] };
     try {

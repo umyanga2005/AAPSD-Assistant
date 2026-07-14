@@ -1,7 +1,19 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
-import { supabase } from '../src/supabase.ts';
+import { auth } from '../src/firebase.js';
 
-vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session: { access_token: 'mock-token' } } } as any);
-vi.spyOn(supabase.auth, 'onAuthStateChange').mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as any);
-vi.spyOn(supabase.auth, 'signOut').mockResolvedValue({ error: null });
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(),
+  GoogleAuthProvider: vi.fn(),
+  onAuthStateChanged: vi.fn((auth, cb) => {
+    cb({ uid: 'mock-uid', email: 'test@example.com', getIdToken: () => Promise.resolve('mock-token') });
+    return () => {};
+  }),
+  signInWithEmailAndPassword: vi.fn(),
+  signInWithPopup: vi.fn(),
+  signOut: vi.fn(),
+}));
+
+vi.mock('firebase/app', () => ({
+  initializeApp: vi.fn(),
+}));

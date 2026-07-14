@@ -8,3 +8,5 @@ coverage/
 .DS_Store
 .vscode/settings.json
 actions-runner/
+
+firebase-adminsdk.json

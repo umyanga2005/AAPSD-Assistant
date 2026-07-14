@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fetchWithAuth } from '../api.js';
 
 interface PipelineRun {
   id: string;
@@ -81,7 +82,7 @@ export default function PipelinesPage() {
     async function load() {
       setViewState('loading');
       try {
-        const response = await fetch(`${apiUrl}/api/pipelines`);
+        const response = await fetchWithAuth(`${apiUrl}/api/pipelines`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const body = (await response.json()) as { data: ApiPipelineRun[] };
         if (cancelled) return;

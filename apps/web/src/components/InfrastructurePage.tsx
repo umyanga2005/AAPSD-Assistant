@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fetchWithAuth } from '../api.js';
 
 interface Deployment {
   name: string;
@@ -50,7 +51,7 @@ export default function InfrastructurePage() {
     async function load() {
       setViewState('loading');
       try {
-        const response = await fetch(`${apiUrl}/api/infrastructure`);
+        const response = await fetchWithAuth(`${apiUrl}/api/infrastructure`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const body = (await response.json()) as InfrastructureData;
         if (cancelled) return;

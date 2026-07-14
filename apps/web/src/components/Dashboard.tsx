@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { fetchWithAuth } from '../api.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -72,8 +73,12 @@ export default function Dashboard() {
         setWsStatus('connected');
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
+          const [infraRes, pipeRes] = await Promise.all([
+          fetchWithAuth(`${apiUrl}/api/infrastructure`),
+          fetchWithAuth(`${apiUrl}/api/pipelines`),
+        ]);
           const message = JSON.parse(event.data);
           if (message.type === 'update') {
             setState(message.payload);

@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import type { DiagnosisResult } from '@aapsd/contracts';
+import { fetchWithAuth } from '../api.js';
 
 type ViewState = 'form' | 'loading' | 'success' | 'error';
 
@@ -80,7 +81,7 @@ export default function AssistantScreen() {
     if (Object.keys(context).length > 0) body.context = context;
 
     try {
-      const response = await fetch(`${apiUrl}/api/v1/diagnoses`, {
+      const response = await fetchWithAuth(`${apiUrl}/api/v1/diagnoses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

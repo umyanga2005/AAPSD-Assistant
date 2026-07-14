@@ -146,3 +146,21 @@ export const auditEvents = pgTable(
     auditCreatedIdx: index('idx_audit_created_at').on(table.createdAt),
   }),
 );
+
+export const userIntegrations = pgTable(
+  'user_integrations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    provider: varchar('provider', { length: 50 }).notNull(),
+    accessToken: text('access_token').notNull(),
+    metadata: jsonb('metadata').default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    uiUserIdx: index('idx_user_integrations_user_id').on(table.userId),
+    uiProviderIdx: index('idx_user_integrations_provider').on(table.provider),
+    uiUnique: uniqueIndex('idx_user_integrations_user_provider').on(table.userId, table.provider),
+  }),
+);

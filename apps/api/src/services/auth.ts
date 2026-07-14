@@ -78,3 +78,31 @@ export async function getProjectRole(userId: string, projectId: string): Promise
 
   return rows.length > 0 ? (rows[0].role as Role) : null;
 }
+
+export async function resolveFirebaseUser(email: string, name: string): Promise<DevUser> {
+  const db = getDb();
+  const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  if (existing.length > 0) {
+    return {
+      id: existing[0].id,
+      email: existing[0].email,
+      name: existing[0].name,
+      role: existing[0].role as Role,
+    };
+  }
+
+  const [newUser] = await db.insert(users).values({
+    email,
+    name,
+    role: 'developer',
+  }).returning();
+
+  return {
+    id: newUser.id,
+    email: newUser.email,
+    name: newUser.name,
+    role: newUser.role as Role,
+  };
+}
+

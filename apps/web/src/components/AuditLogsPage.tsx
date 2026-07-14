@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fetchWithAuth } from '../api.js';
 
 interface AuditEvent {
   id: string;
@@ -83,13 +84,7 @@ export default function AuditLogsPage() {
     async function load() {
       setViewState('loading');
       try {
-        // Attempt to fetch from API. Need to provide dummy project_id and user headers.
-        const response = await fetch(`${apiUrl}/api/audit-events?project_id=mock-project-1`, {
-          headers: {
-            'X-Dev-User-Id': '00000000-0000-0000-0000-000000000001',
-            'X-Dev-Role': 'administrator',
-          },
-        });
+        const response = await fetchWithAuth(`${apiUrl}/api/audit-events?project_id=mock-project-1`);
 
         if (!response.ok) {
           throw new Error('Fallback to mock');

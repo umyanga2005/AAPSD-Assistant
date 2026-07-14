@@ -7,6 +7,10 @@ import InfrastructurePage from './components/InfrastructurePage.js';
 import Dashboard from './components/Dashboard.js';
 import AuditLogsPage from './components/AuditLogsPage.js';
 import IncidentsPage from './components/IncidentsPage.js';
+import Settings from './components/Settings.js';
+import Login from './components/Login.js';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from './firebase.js';
 import './App.css';
 
 const PAGES: Record<string, { title: string; description: string }> = {
@@ -34,6 +38,10 @@ const PAGES: Record<string, { title: string; description: string }> = {
     title: 'Audit Log',
     description: 'All actions, approvals, and system events.',
   },
+  settings: {
+    title: 'Settings',
+    description: 'Manage integrations and preferences.',
+  },
 };
 
 const getInitialPage = () => {
@@ -45,7 +53,18 @@ const getInitialPage = () => {
 export default function App() {
   const [page, setPage] = useState(getInitialPage());
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const current = PAGES[page];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -54,6 +73,18 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen w-full bg-brand-dark">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onSuccess={() => setPage('dashboard')} />;
+  }
 
   return (
     <div className="flex h-screen w-full bg-brand-dark overflow-hidden">
@@ -94,6 +125,8 @@ export default function App() {
             <IncidentsPage />
           ) : page === 'audit' ? (
             <AuditLogsPage />
+          ) : page === 'settings' ? (
+            <Settings />
           ) : (
             <div className="animate-fade-in glass-panel rounded-xl p-8 max-w-4xl mx-auto mt-8 border-brand-primary/20">
               <h1 className="text-3xl font-bold text-white mb-2">{current.title}</h1>
