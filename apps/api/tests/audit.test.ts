@@ -196,7 +196,7 @@ describe('getAuditEventsByProject', () => {
 describe('GET /api/audit-events', () => {
   it('returns 400 when project_id is missing', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'GET',
       url: '/api/audit-events',
@@ -211,7 +211,7 @@ describe('GET /api/audit-events', () => {
 
   it('returns 200 with audit events', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     mockAuditOffset.mockResolvedValue([{ id: 'event-1', eventType: 'request.created' }]);
 
     const response = await app.inject({

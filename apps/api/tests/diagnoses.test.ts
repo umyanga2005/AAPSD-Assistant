@@ -71,7 +71,7 @@ describe('POST /api/v1/diagnoses', () => {
     vi.mocked(runDiagnosis).mockResolvedValue(FAKE_RESULT);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',
@@ -93,7 +93,7 @@ describe('POST /api/v1/diagnoses', () => {
     vi.mocked(runDiagnosis).mockResolvedValue(FAKE_RESULT);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',
@@ -121,7 +121,7 @@ describe('POST /api/v1/diagnoses', () => {
 
   it('returns 401 without X-Dev-User-Id header', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',
@@ -136,7 +136,7 @@ describe('POST /api/v1/diagnoses', () => {
 
   it('returns 400 with missing required fields', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',
@@ -153,7 +153,7 @@ describe('POST /api/v1/diagnoses', () => {
 
   it('returns 400 with non-object JSON body', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',
@@ -169,7 +169,7 @@ describe('POST /api/v1/diagnoses', () => {
 
   it('returns 400 when query is an empty string', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/diagnoses',

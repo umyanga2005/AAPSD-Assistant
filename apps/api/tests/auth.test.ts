@@ -135,7 +135,7 @@ describe('getProjectRole', () => {
 describe('GET /api/audit-events (auth)', () => {
   it('returns 401 without X-Dev-User-Id header', async () => {
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'GET',
       url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,
@@ -154,7 +154,7 @@ describe('GET /api/audit-events (auth)', () => {
     mockMemberLimit.mockResolvedValue([]);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'GET',
       url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,
@@ -174,7 +174,7 @@ describe('GET /api/audit-events (auth)', () => {
     mockMemberLimit.mockResolvedValue([]);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     await app.inject({
       method: 'GET',
       url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,
@@ -196,7 +196,7 @@ describe('GET /api/audit-events (auth)', () => {
     mockAuditOffset.mockResolvedValue([{ id: 'event-1', eventType: 'request.created' }]);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'GET',
       url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,
@@ -219,7 +219,7 @@ describe('GET /api/audit-events (auth)', () => {
     mockAuditOffset.mockResolvedValue([{ id: 'event-1', eventType: 'request.created' }]);
 
     const { buildApp } = await import('../src/index.js');
-    const app = buildApp();
+    const app = await buildApp();
     const response = await app.inject({
       method: 'GET',
       url: `/api/audit-events?project_id=${DEV_PROJECT_ID}`,

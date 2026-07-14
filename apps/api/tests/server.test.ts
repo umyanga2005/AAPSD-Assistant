@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/index.js';
 
 describe('API', () => {
-  const app = buildApp();
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
 
   afterAll(async () => {
     await app.close();
@@ -21,6 +26,15 @@ describe('API', () => {
       expect(body).toHaveProperty('service', '@aapsd/api');
       expect(body).toHaveProperty('timestamp');
       expect(typeof body.timestamp).toBe('string');
+    });
+  });
+
+  describe('GET /api/ws/dashboard', () => {
+    it('accepts a WebSocket upgrade', async () => {
+      const socket = await app.injectWS('/api/ws/dashboard');
+
+      expect(socket.readyState).toBe(1);
+      socket.close();
     });
   });
 
