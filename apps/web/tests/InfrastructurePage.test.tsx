@@ -20,17 +20,37 @@ describe('InfrastructurePage', () => {
 
   const mockData = {
     deployments: [
-      { name: 'api', namespace: 'default', replicas: 2, availableReplicas: 2, status: 'healthy' },
-      { name: 'worker', namespace: 'default', replicas: 1, availableReplicas: 1, status: 'healthy' },
-      { name: 'db', namespace: 'default', replicas: 1, availableReplicas: 0, status: 'degraded' },
-      { name: 'cache', namespace: 'default', replicas: 3, availableReplicas: 3, status: 'healthy' }
+      { name: 'api', namespace: 'default', replicas: 2, availableReplicas: 2 },
+      { name: 'worker', namespace: 'default', replicas: 1, availableReplicas: 1 },
+      { name: 'db', namespace: 'default', replicas: 1, availableReplicas: 0 },
+      { name: 'cache', namespace: 'default', replicas: 3, availableReplicas: 3 },
     ],
     pods: [
-      { name: 'api-1', namespace: 'default', status: 'Running', restarts: 0, cpuUsage: '100m', memoryUsage: '128Mi' },
-      { name: 'api-2', namespace: 'default', status: 'Running', restarts: 1, cpuUsage: '120m', memoryUsage: '140Mi' },
-      { name: 'worker-1', namespace: 'default', status: 'CrashLoopBackOff', restarts: 10, cpuUsage: '0m', memoryUsage: '0Mi' },
-      { name: 'db-1', namespace: 'default', status: 'Pending', restarts: 0, cpuUsage: '0m', memoryUsage: '0Mi' }
-    ]
+      {
+        name: 'api-1',
+        namespace: 'default',
+        phase: 'Running',
+        containers: [{ name: 'api', restartCount: 0, ready: true, state: 'Running' }],
+      },
+      {
+        name: 'api-2',
+        namespace: 'default',
+        phase: 'Running',
+        containers: [{ name: 'api', restartCount: 1, ready: true, state: 'Running' }],
+      },
+      {
+        name: 'worker-1',
+        namespace: 'default',
+        phase: 'CrashLoopBackOff',
+        containers: [{ name: 'worker', restartCount: 10, ready: false, state: 'Waiting' }],
+      },
+      {
+        name: 'db-1',
+        namespace: 'default',
+        phase: 'Pending',
+        containers: [{ name: 'db', restartCount: 0, ready: false, state: 'Waiting' }],
+      },
+    ],
   };
 
   it('shows error state when API call fails', async () => {
