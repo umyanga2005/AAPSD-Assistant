@@ -114,7 +114,10 @@ export async function getJobStatus(jobId: string) {
   const failedReason = job.failedReason;
   const returnvalue = job.returnvalue;
 
-  const count = await executionQueue.getWaitingCount();
+  let count = 0;
+  if (typeof executionQueue.getWaitingCount === 'function') {
+    count = await executionQueue.getWaitingCount();
+  }
   apiQueueDepthTotal.set(count);
 
   return {
