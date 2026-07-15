@@ -6,6 +6,7 @@ export interface AppConfig {
   nodeEnv: 'development' | 'production' | 'test';
   gitHubToken?: string;
   gitHubAllowedRepos: string[];
+  gitHubAllowedWorkflows: string[];
   k8sToken?: string;
   k8sApiServerUrl?: string;
   k8sAllowedNamespaces: string[];
@@ -67,6 +68,14 @@ export function getConfig(): AppConfig {
         .filter(Boolean)
     : [];
 
+  const allowedWorkflowsRaw = process.env.GITHUB_ALLOWED_WORKFLOWS || '';
+  const gitHubAllowedWorkflows = allowedWorkflowsRaw
+    ? allowedWorkflowsRaw
+        .split(',')
+        .map((w) => w.trim())
+        .filter(Boolean)
+    : [];
+
   const k8sToken = process.env.K8S_TOKEN || undefined;
   const k8sApiServerUrl = process.env.K8S_API_SERVER_URL || undefined;
   const allowedNamespacesRaw = process.env.K8S_ALLOWED_NAMESPACES || '';
@@ -113,6 +122,7 @@ export function getConfig(): AppConfig {
     nodeEnv: nodeEnvRaw ? (nodeEnvRaw as AppConfig['nodeEnv']) : 'development',
     gitHubToken,
     gitHubAllowedRepos,
+    gitHubAllowedWorkflows,
     k8sToken,
     k8sApiServerUrl,
     k8sAllowedNamespaces,

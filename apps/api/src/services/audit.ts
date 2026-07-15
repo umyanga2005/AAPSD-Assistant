@@ -7,6 +7,11 @@ export const AUDIT_ACTION_PLAN_DENIED = 'action.plan.denied';
 export const AUDIT_ACTION_PLAN_APPROVED = 'action.plan.approved';
 export const AUDIT_ACTION_PLAN_REJECTED = 'action.plan.rejected';
 export const AUDIT_ACTION_PLAN_EXPIRED = 'action.plan.expired';
+export const AUDIT_ACTION_EXECUTOR_QUEUED = 'action.executor.queued';
+export const AUDIT_ACTION_EXECUTOR_RUNNING = 'action.executor.running';
+export const AUDIT_ACTION_EXECUTOR_SUCCEEDED = 'action.executor.succeeded';
+export const AUDIT_ACTION_EXECUTOR_FAILED = 'action.executor.failed';
+export const AUDIT_ACTION_EXECUTOR_TIMED_OUT = 'action.executor.timed_out';
 
 const SENSITIVE_KEY_PATTERNS = [
   /^api[-_]?key$/i,

@@ -12,6 +12,7 @@ import {
   AUDIT_ACTION_PLAN_REJECTED,
   recordAuditEvent,
 } from '../services/audit.js';
+import { executeGitHubWorkflow } from '../services/github-executor.js';
 
 export const actionRoutes: FastifyPluginAsync = async (app) => {
   const configResult = getConfigSafe();
@@ -305,6 +306,35 @@ export const actionRoutes: FastifyPluginAsync = async (app) => {
       });
 
       return reply.status(200).send(updated[0]);
+    },
+  );
+
+  // POST /api/action-plans/:id/execute
+  app.post<{
+    Params: { id: string };
+  }>(
+    '/action-plans/:id/execute',
+    {
+      schema: {
+        params: Type.Object({
+          id: Type.String({ format: 'uuid' }),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const user = (request as unknown as Record<string, unknown>).user as
+        { id: string; role: string } | undefined;
+      if (!user) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
+
+      try {
+        const result = await executeGitHubWorkflow(request.params.id, user.id);
+        return reply.status(200).send(result);
+      } catch (error: unknown) {
+        const err = error as Error;
+        return reply.status(400).send({ error: 'Execution failed', reason: err.message });
+      }
     },
   );
 };
