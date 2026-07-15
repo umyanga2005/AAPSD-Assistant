@@ -1,4 +1,5 @@
-export type EvidenceSource = 'github' | 'kubernetes' | 'prometheus' | 'runbook';
+export type EvidenceSource =
+  'github' | 'kubernetes' | 'prometheus' | 'runbook' | 'docker' | 'terraform';
 
 export type Confidence = 'high' | 'medium' | 'low' | 'insufficient_evidence';
 

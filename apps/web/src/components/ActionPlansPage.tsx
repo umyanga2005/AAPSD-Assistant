@@ -90,7 +90,7 @@ export default function ActionPlansPage() {
       let parsedArgs;
       try {
         parsedArgs = JSON.parse(newArgs);
-      } catch (_e) {
+      } catch {
         throw new Error('Invalid JSON args');
       }
 

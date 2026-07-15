@@ -15,6 +15,9 @@ export interface AppConfig {
   actionAllowedDeployments: string[];
   actionMinScale: number;
   actionMaxScale: number;
+  dockerDaemonUrl?: string;
+  terraformApiUrl?: string;
+  terraformToken?: string;
 }
 
 export class ConfigError extends Error {
@@ -110,6 +113,10 @@ export function getConfig(): AppConfig {
     ? parseInt(process.env.ACTION_MAX_SCALE, 10)
     : 5;
 
+  const dockerDaemonUrl = process.env.DOCKER_DAEMON_URL || undefined;
+  const terraformApiUrl = process.env.TERRAFORM_API_URL || undefined;
+  const terraformToken = process.env.TERRAFORM_TOKEN || undefined;
+
   if (errors.length > 0) {
     throw new ConfigError(errors);
   }
@@ -131,6 +138,9 @@ export function getConfig(): AppConfig {
     actionAllowedDeployments,
     actionMinScale,
     actionMaxScale,
+    dockerDaemonUrl,
+    terraformApiUrl,
+    terraformToken,
   };
 }
 

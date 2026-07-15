@@ -14,6 +14,12 @@ vi.mock('@aapsd/diagnosis', async (importOriginal) => {
   return {
     ...actual,
     runDiagnosis: vi.fn(),
+    RealDockerAdapter: vi.fn(),
+    setDockerAdapter: vi.fn(),
+    getDockerAdapter: vi.fn(),
+    RealTerraformAdapter: vi.fn(),
+    setTerraformAdapter: vi.fn(),
+    getTerraformAdapter: vi.fn(),
   };
 });
 

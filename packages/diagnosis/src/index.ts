@@ -43,3 +43,19 @@ export type {
   MetricResult,
 } from './prometheus-adapter/index.js';
 export { ALL_METRICS } from './prometheus-adapter/index.js';
+
+export {
+  setDockerAdapter,
+  getDockerAdapter,
+  RealDockerAdapter,
+  DockerApiError,
+} from './docker-adapter/index.js';
+export type { DockerAdapter, DockerImageMetadata } from './docker-adapter/index.js';
+
+export {
+  setTerraformAdapter,
+  getTerraformAdapter,
+  RealTerraformAdapter,
+  TerraformApiError,
+} from './terraform-adapter/index.js';
+export type { TerraformAdapter, TerraformWorkspaceSummary } from './terraform-adapter/index.js';

@@ -96,7 +96,7 @@ export default function AuditLogsPage() {
 
         setEvents(body || []);
         setViewState('success');
-      } catch (err) {
+      } catch {
         if (cancelled) return;
         setViewState('success'); // Fallback to empty if it fails to fetch (simulating no logs)
         setEvents([]);

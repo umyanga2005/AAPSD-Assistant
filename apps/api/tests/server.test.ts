@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/index.js';
-import * as authService from '../src/services/auth.js';
 
 vi.mock('../src/services/auth.js', async () => {
   const actual = await vi.importActual('../src/services/auth.js');
@@ -11,7 +10,7 @@ vi.mock('../src/services/auth.js', async () => {
       id: 'user-1',
       email: 'test@local',
       name: 'Test',
-      role: 'admin'
+      role: 'admin',
     }),
   };
 });

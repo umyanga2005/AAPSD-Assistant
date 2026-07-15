@@ -10,6 +10,8 @@ interface FormData {
   podName: string;
   timeRangeStart: string;
   timeRangeEnd: string;
+  dockerImageId: string;
+  terraformWorkspaceId: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -18,6 +20,8 @@ const EMPTY_FORM: FormData = {
   podName: '',
   timeRangeStart: '',
   timeRangeEnd: '',
+  dockerImageId: '',
+  terraformWorkspaceId: '',
 };
 
 function confidenceLabel(value: string): string {
@@ -46,7 +50,8 @@ export default function AssistantScreen() {
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
   const devUserId = import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-0000-0000-000000000001';
   const devRole = import.meta.env.VITE_DEV_ROLE ?? 'viewer';
-  const devProjectId = import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000002';
+  const devProjectId =
+    import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000002';
   const devEnvId = import.meta.env.VITE_DEV_ENV_ID ?? '00000000-0000-0000-0000-000000000003';
 
   useEffect(() => {
@@ -78,6 +83,8 @@ export default function AssistantScreen() {
     if (form.timeRangeStart && form.timeRangeEnd) {
       context.timeRange = { start: form.timeRangeStart, end: form.timeRangeEnd };
     }
+    if (form.dockerImageId) context.dockerImageId = form.dockerImageId;
+    if (form.terraformWorkspaceId) context.terraformWorkspaceId = form.terraformWorkspaceId;
     if (Object.keys(context).length > 0) body.context = context;
 
     try {
@@ -169,6 +176,30 @@ export default function AssistantScreen() {
                 placeholder="e.g. api-5d8f7c9b6c-abcde"
                 value={form.podName}
                 onChange={(e) => updateField('podName', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-brand-muted">
+                Docker Image ID (optional)
+              </label>
+              <input
+                type="text"
+                className="w-full bg-brand-surfaceHover border border-brand-border rounded-lg px-4 py-2.5 text-white placeholder-brand-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all"
+                placeholder="e.g. sha256:abcd..."
+                value={form.dockerImageId}
+                onChange={(e) => updateField('dockerImageId', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-brand-muted">
+                Terraform Workspace (optional)
+              </label>
+              <input
+                type="text"
+                className="w-full bg-brand-surfaceHover border border-brand-border rounded-lg px-4 py-2.5 text-white placeholder-brand-muted/50 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all"
+                placeholder="e.g. ws-12345"
+                value={form.terraformWorkspaceId}
+                onChange={(e) => updateField('terraformWorkspaceId', e.target.value)}
               />
             </div>
           </div>

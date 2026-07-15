@@ -45,6 +45,10 @@ import {
   getPrometheusAdapter,
   ALL_METRICS,
   type ModelProvider,
+  RealDockerAdapter,
+  setDockerAdapter,
+  RealTerraformAdapter,
+  setTerraformAdapter,
 } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
 
@@ -86,6 +90,18 @@ export async function buildApp(): Promise<FastifyInstance> {
         : ALL_METRICS,
   });
   setPrometheusAdapter(promAdapter);
+
+  const dockerAdapter = new RealDockerAdapter(
+    ('dockerDaemonUrl' in config ? config.dockerDaemonUrl : '') || 'http://localhost/v1.41',
+  );
+  setDockerAdapter(dockerAdapter);
+
+  const terraformAdapter = new RealTerraformAdapter(
+    ('terraformApiUrl' in config ? config.terraformApiUrl : '') ||
+      'https://app.terraform.io/api/v2',
+    ('terraformToken' in config ? config.terraformToken : '') || 'dummy_tf_token',
+  );
+  setTerraformAdapter(terraformAdapter);
 
   const app = Fastify({
     logger: true,

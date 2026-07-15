@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { fetchWithAuth } from '../api.js';
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -72,12 +72,12 @@ export default function Dashboard() {
 
     const connectWs = async () => {
       setWsStatus('connecting');
-      
+
       let token = '';
       if (auth.currentUser) {
         token = await auth.currentUser.getIdToken();
       }
-      
+
       const ws = new WebSocket(`${wsUrl}?token=${token}`);
 
       ws.onopen = () => {
@@ -264,7 +264,11 @@ export default function Dashboard() {
             Pod Restarts
           </h3>
           <p className="text-white text-3xl font-bold">
-            {state?.metrics?.restarts?.values?.at(-1) !== undefined ? state.metrics.restarts.values.at(-1) : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+            {state?.metrics?.restarts?.values?.at(-1) !== undefined ? (
+              state.metrics.restarts.values.at(-1)
+            ) : (
+              <span className="text-brand-muted italic text-xl">Unavailable</span>
+            )}
           </p>
         </div>
         <div className="glass-panel p-6 rounded-2xl border-brand-border text-center">
@@ -272,7 +276,11 @@ export default function Dashboard() {
             Error Rate
           </h3>
           <p className="text-white text-3xl font-bold">
-            {state?.metrics?.error_rate?.values?.at(-1) !== undefined ? `${state.metrics.error_rate.values.at(-1)?.toFixed(2)} req/s` : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+            {state?.metrics?.error_rate?.values?.at(-1) !== undefined ? (
+              `${state.metrics.error_rate.values.at(-1)?.toFixed(2)} req/s`
+            ) : (
+              <span className="text-brand-muted italic text-xl">Unavailable</span>
+            )}
           </p>
         </div>
         <div className="glass-panel p-6 rounded-2xl border-brand-border text-center">
@@ -280,7 +288,11 @@ export default function Dashboard() {
             P99 Latency
           </h3>
           <p className="text-white text-3xl font-bold">
-            {state?.metrics?.latency?.values?.at(-1) !== undefined ? `${state.metrics.latency.values.at(-1)?.toFixed(2)}s` : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+            {state?.metrics?.latency?.values?.at(-1) !== undefined ? (
+              `${state.metrics.latency.values.at(-1)?.toFixed(2)}s`
+            ) : (
+              <span className="text-brand-muted italic text-xl">Unavailable</span>
+            )}
           </p>
         </div>
       </div>

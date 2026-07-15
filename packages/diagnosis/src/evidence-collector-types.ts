@@ -4,6 +4,8 @@ export interface EvidenceCollectorOptions {
   pipelineRunId?: string;
   podName?: string;
   timeRange?: { start: string; end: string };
+  dockerImageId?: string;
+  terraformWorkspaceId?: string;
 }
 
 export interface EvidenceCollector {
