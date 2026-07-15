@@ -185,6 +185,64 @@ export const oauthStates = pgTable(
   }),
 );
 
+export const diagnoses = pgTable(
+  'diagnoses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    requestId: varchar('request_id', { length: 255 }).notNull(),
+    status: varchar('status', { length: 50 }).notNull().default('pending'),
+    result: jsonb('result'),
+    error: text('error'),
+    traceId: varchar('trace_id', { length: 255 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    diagProjectIdx: index('idx_diag_project_id').on(table.projectId),
+    diagRequestIdx: uniqueIndex('idx_diag_request_id').on(table.requestId),
+    diagTraceIdx: index('idx_diag_trace_id').on(table.traceId),
+  }),
+);
+
+export const actionPlans = pgTable(
+  'action_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    environmentId: uuid('environment_id')
+      .notNull()
+      .references(() => environments.id, { onDelete: 'cascade' }),
+    actionType: varchar('action_type', { length: 100 }).notNull(),
+    typedArgs: jsonb('typed_args').notNull(),
+    status: varchar('status', { length: 50 }).notNull().default('pending'),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    approverId: uuid('approver_id').references(() => users.id, { onDelete: 'set null' }),
+    policyResult: jsonb('policy_result'),
+    traceId: varchar('trace_id', { length: 255 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    apProjectIdx: index('idx_ap_project_id').on(table.projectId),
+    apEnvIdx: index('idx_ap_environment_id').on(table.environmentId),
+    apStatusIdx: index('idx_ap_status').on(table.status),
+  }),
+);
+
 export const incidents = pgTable(
   'incidents',
   {

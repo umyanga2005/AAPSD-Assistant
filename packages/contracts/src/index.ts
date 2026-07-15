@@ -71,3 +71,53 @@ export interface ModelResponse {
   confidence: Confidence;
   needs_human_review: boolean;
 }
+
+export type ActionType =
+  'github.workflow.dispatch' | 'kubernetes.deployment.restart' | 'kubernetes.deployment.scale';
+
+export interface GitHubWorkflowDispatchArgs {
+  repo: string;
+  workflowId: string;
+  ref: string;
+  inputs?: Record<string, string>;
+}
+
+export interface KubernetesDeploymentRestartArgs {
+  namespace: string;
+  deploymentName: string;
+}
+
+export interface KubernetesDeploymentScaleArgs {
+  namespace: string;
+  deploymentName: string;
+  replicas: number;
+}
+
+export type ActionArgs =
+  GitHubWorkflowDispatchArgs | KubernetesDeploymentRestartArgs | KubernetesDeploymentScaleArgs;
+
+export type ActionPlanStatus =
+  'pending' | 'approved' | 'rejected' | 'expired' | 'executed' | 'failed';
+
+export interface ActionPlan {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  actionType: ActionType;
+  typedArgs: ActionArgs;
+  status: ActionPlanStatus;
+  actorId: string;
+  approverId?: string | null;
+  policyResult?: Record<string, unknown> | null;
+  traceId: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActionPlanRequest {
+  projectId: string;
+  environmentId: string;
+  actionType: ActionType;
+  typedArgs: ActionArgs;
+}

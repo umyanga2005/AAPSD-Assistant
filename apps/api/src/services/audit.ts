@@ -2,6 +2,12 @@ import { eq, desc } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { auditEvents } from '../db/schema.js';
 
+export const AUDIT_ACTION_PLAN_CREATED = 'action.plan.created';
+export const AUDIT_ACTION_PLAN_DENIED = 'action.plan.denied';
+export const AUDIT_ACTION_PLAN_APPROVED = 'action.plan.approved';
+export const AUDIT_ACTION_PLAN_REJECTED = 'action.plan.rejected';
+export const AUDIT_ACTION_PLAN_EXPIRED = 'action.plan.expired';
+
 const SENSITIVE_KEY_PATTERNS = [
   /^api[-_]?key$/i,
   /^secret/i,

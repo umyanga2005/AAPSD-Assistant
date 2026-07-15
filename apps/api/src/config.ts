@@ -11,6 +11,9 @@ export interface AppConfig {
   k8sAllowedNamespaces: string[];
   prometheusBaseUrl?: string;
   prometheusAllowedMetrics: string[];
+  actionAllowedDeployments: string[];
+  actionMinScale: number;
+  actionMaxScale: number;
 }
 
 export class ConfigError extends Error {
@@ -83,6 +86,21 @@ export function getConfig(): AppConfig {
         .filter(Boolean)
     : [];
 
+  const actionAllowedDeploymentsRaw = process.env.ACTION_ALLOWED_DEPLOYMENTS || '';
+  const actionAllowedDeployments = actionAllowedDeploymentsRaw
+    ? actionAllowedDeploymentsRaw
+        .split(',')
+        .map((d) => d.trim())
+        .filter(Boolean)
+    : [];
+
+  const actionMinScale = process.env.ACTION_MIN_SCALE
+    ? parseInt(process.env.ACTION_MIN_SCALE, 10)
+    : 1;
+  const actionMaxScale = process.env.ACTION_MAX_SCALE
+    ? parseInt(process.env.ACTION_MAX_SCALE, 10)
+    : 5;
+
   if (errors.length > 0) {
     throw new ConfigError(errors);
   }
@@ -100,6 +118,9 @@ export function getConfig(): AppConfig {
     k8sAllowedNamespaces,
     prometheusBaseUrl,
     prometheusAllowedMetrics,
+    actionAllowedDeployments,
+    actionMinScale,
+    actionMaxScale,
   };
 }
 

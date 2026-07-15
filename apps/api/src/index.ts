@@ -20,6 +20,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm';
 import { decrypt } from './services/encryption.js';
 import authRoutes from './routes/auth.js';
+import { actionRoutes } from './routes/actions.js';
 import { getAuditEventsByProject, recordAuditEvent, getAllAuditEvents } from './services/audit.js';
 import {
   resolveDevUser,
@@ -201,6 +202,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   };
 
   await app.register(authRoutes, { prefix: '/', devAuthPreHandler });
+  app.register(
+    async (api) => {
+      api.addHook('preHandler', devAuthPreHandler);
+      api.register(actionRoutes);
+    },
+    { prefix: '/api' },
+  );
 
   app.get<{ Querystring: { project_id?: string; repo?: string; page?: string; limit?: string } }>(
     '/api/pipelines',
@@ -255,93 +263,109 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   );
 
-  app.get<{ Querystring: { project_id?: string } }>('/api/github/repos', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
-    const user = (request as unknown as Record<string, unknown>).user as { id: string };
-    const db = getDb();
-    const integration = await db
-      .select()
-      .from(userIntegrations)
-      .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
-      .limit(1);
+  app.get<{ Querystring: { project_id?: string } }>(
+    '/api/github/repos',
+    { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] },
+    async (request, reply) => {
+      const user = (request as unknown as Record<string, unknown>).user as { id: string };
+      const db = getDb();
+      const integration = await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
+        .limit(1);
 
-    if (integration.length === 0) {
-      return { repos: [] };
-    }
-
-    const allowedRepos = 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [];
-    const gh = new RealGitHubAdapter({
-      token: decrypt(integration[0].accessToken),
-      allowedRepos,
-    });
-
-    try {
-      if (allowedRepos.length > 0) {
-        return { repos: allowedRepos };
+      if (integration.length === 0) {
+        return { repos: [] };
       }
-      const repos = await gh.getUserRepos();
-      return { repos };
-    } catch (err) {
-      app.log.error(err);
-      return reply.status(502).send({ error: 'GitHub API request failed' });
-    }
-  });
 
-  app.get<{ Querystring: { project_id?: string } }>('/api/infrastructure', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
-    const k8s = getK8sAdapter();
-    const prom = getPrometheusAdapter();
-    
-    if (!k8s) return reply.status(502).send({ error: 'Kubernetes adapter not configured' });
-    const allowedNamespaces = 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
-    const targetNs = allowedNamespaces.length > 0 ? allowedNamespaces[0] : 'default';
-    
-    try {
-      const [deployments, pods] = await Promise.all([
-        k8s.getDeployments(targetNs),
-        k8s.getPods(targetNs),
-      ]);
+      const allowedRepos = 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [];
+      const gh = new RealGitHubAdapter({
+        token: decrypt(integration[0].accessToken),
+        allowedRepos,
+      });
 
-      let metrics: Record<string, unknown> = {
-        cpu: null,
-        memory: null,
-        restarts: null,
-        error_rate: null,
-        latency: null,
-      };
+      try {
+        if (allowedRepos.length > 0) {
+          return { repos: allowedRepos };
+        }
+        const repos = await gh.getUserRepos();
+        return { repos };
+      } catch (err) {
+        app.log.error(err);
+        return reply.status(502).send({ error: 'GitHub API request failed' });
+      }
+    },
+  );
 
-      if (prom) {
-        const [cpu, memory, restarts, error_rate, latency] = await Promise.all([
-          prom.query('cpu').catch(() => null),
-          prom.query('memory').catch(() => null),
-          prom.query('restarts').catch(() => null),
-          prom.query('error_rate').catch(() => null),
-          prom.query('latency').catch(() => null),
+  app.get<{ Querystring: { project_id?: string } }>(
+    '/api/infrastructure',
+    { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] },
+    async (request, reply) => {
+      const k8s = getK8sAdapter();
+      const prom = getPrometheusAdapter();
+
+      if (!k8s) return reply.status(502).send({ error: 'Kubernetes adapter not configured' });
+      const allowedNamespaces = 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
+      const targetNs = allowedNamespaces.length > 0 ? allowedNamespaces[0] : 'default';
+
+      try {
+        const [deployments, pods] = await Promise.all([
+          k8s.getDeployments(targetNs),
+          k8s.getPods(targetNs),
         ]);
-        metrics = { cpu, memory, restarts, error_rate, latency };
-      }
 
-      return { deployments, pods, metrics };
-    } catch (err) {
-      app.log.error(err);
-      return reply.status(502).send({ error: 'Failed to fetch Kubernetes infrastructure data' });
-    }
-  });
+        let metrics: Record<string, unknown> = {
+          cpu: null,
+          memory: null,
+          restarts: null,
+          error_rate: null,
+          latency: null,
+        };
 
-  app.get<{ Querystring: { project_id?: string } }>('/api/incidents', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
-    const db = getDb();
-    const { project_id } = request.query;
-    try {
-      let data;
-      if (project_id) {
-        data = await db.select().from(incidents).where(eq(incidents.projectId, project_id)).orderBy(desc(incidents.createdAt));
-      } else {
-        data = await db.select().from(incidents).orderBy(desc(incidents.createdAt));
+        if (prom) {
+          const [cpu, memory, restarts, error_rate, latency] = await Promise.all([
+            prom.query('cpu').catch(() => null),
+            prom.query('memory').catch(() => null),
+            prom.query('restarts').catch(() => null),
+            prom.query('error_rate').catch(() => null),
+            prom.query('latency').catch(() => null),
+          ]);
+          metrics = { cpu, memory, restarts, error_rate, latency };
+        }
+
+        return { deployments, pods, metrics };
+      } catch (err) {
+        app.log.error(err);
+        return reply.status(502).send({ error: 'Failed to fetch Kubernetes infrastructure data' });
       }
-      return data;
-    } catch (err) {
-      app.log.error(err);
-      return reply.status(500).send({ error: 'Failed to fetch incidents' });
-    }
-  });
+    },
+  );
+
+  app.get<{ Querystring: { project_id?: string } }>(
+    '/api/incidents',
+    { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] },
+    async (request, reply) => {
+      const db = getDb();
+      const { project_id } = request.query;
+      try {
+        let data;
+        if (project_id) {
+          data = await db
+            .select()
+            .from(incidents)
+            .where(eq(incidents.projectId, project_id))
+            .orderBy(desc(incidents.createdAt));
+        } else {
+          data = await db.select().from(incidents).orderBy(desc(incidents.createdAt));
+        }
+        return data;
+      } catch (err) {
+        app.log.error(err);
+        return reply.status(500).send({ error: 'Failed to fetch incidents' });
+      }
+    },
+  );
 
   app.post<{
     Querystring: { project_id?: string };
@@ -353,39 +377,43 @@ export async function buildApp(): Promise<FastifyInstance> {
       description: string;
       impactedComponent: string;
     };
-  }>('/api/incidents', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
-    const db = getDb();
-    try {
-      const { title, severity, status, description, impactedComponent } = request.body;
-      const projectId = request.body.projectId || request.query.project_id;
-      if (!projectId) return reply.status(400).send({ error: 'projectId is required' });
+  }>(
+    '/api/incidents',
+    { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] },
+    async (request, reply) => {
+      const db = getDb();
+      try {
+        const { title, severity, status, description, impactedComponent } = request.body;
+        const projectId = request.body.projectId || request.query.project_id;
+        if (!projectId) return reply.status(400).send({ error: 'projectId is required' });
 
-      const newIncident = await db
-        .insert(incidents)
-        .values({
-          projectId,
-          title,
-          severity,
-          status,
-          description,
-          impactedComponent,
-        })
-        .returning();
-      return newIncident[0];
-    } catch (err) {
-      app.log.error(err);
-      return reply.status(500).send({ error: 'Failed to create incident' });
-    }
-  });
+        const newIncident = await db
+          .insert(incidents)
+          .values({
+            projectId,
+            title,
+            severity,
+            status,
+            description,
+            impactedComponent,
+          })
+          .returning();
+        return newIncident[0];
+      } catch (err) {
+        app.log.error(err);
+        return reply.status(500).send({ error: 'Failed to create incident' });
+      }
+    },
+  );
 
   app.route<{ Querystring: { project_id?: string; token?: string } }>({
     method: 'GET',
     url: '/api/ws/dashboard',
     preHandler: [devAuthPreHandler, _requireProjectRole('viewer')],
-    handler: (req, reply) => {
+    handler: (_req, reply) => {
       reply.status(400).send({ error: 'WebSocket connection required' });
     },
-    wsHandler: (connection, req) => {
+    wsHandler: (connection, _req) => {
       const sendUpdates = async () => {
         try {
           const gh = getGitHubAdapter();
@@ -411,7 +439,8 @@ export async function buildApp(): Promise<FastifyInstance> {
             pods: [],
           };
           if (k8s) {
-            const allowedNamespaces = 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
+            const allowedNamespaces =
+              'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
             const targetNs = allowedNamespaces.length > 0 ? allowedNamespaces[0] : 'default';
             const [deployments, pods] = await Promise.all([
               k8s.getDeployments(targetNs).catch(() => []),

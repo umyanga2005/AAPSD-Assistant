@@ -1,2 +1,2 @@
 export const name = '@aapsd/policy';
-console.log(name);
+export * from './evaluator.js';
