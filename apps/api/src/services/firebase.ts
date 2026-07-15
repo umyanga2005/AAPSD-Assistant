@@ -9,7 +9,7 @@ try {
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || 'firebase-adminsdk.json';
   const fileContents = readFileSync(join(process.cwd(), serviceAccountPath), 'utf8');
   serviceAccount = JSON.parse(fileContents);
-} catch (_err) {
+} catch {
   console.warn(
     '⚠️  Could not load Firebase Service Account from file. Firebase Admin may not initialize properly if default credentials are not set.',
   );

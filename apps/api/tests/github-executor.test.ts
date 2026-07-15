@@ -89,6 +89,8 @@ describe('Policy Test: GitHub Workflow Dispatch', () => {
 describe('Executor Test: executeGitHubWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDb.limit.mockReset();
+    mockDb.limit.mockReturnThis();
   });
 
   it('successfully executes an approved staging plan', async () => {
@@ -151,6 +153,8 @@ describe('Integration Test: POST /action-plans/:id/execute', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockDb.limit.mockReset();
+    mockDb.limit.mockReturnThis();
     app = Fastify();
 
     app.addHook('preHandler', async (request: unknown) => {
@@ -192,7 +196,8 @@ describe('Integration Test: POST /action-plans/:id/execute', () => {
     });
 
     const body = JSON.parse(response.body);
-    expect(response.statusCode).toBe(200);
-    expect(body.status).toBe('succeeded');
+    expect(response.statusCode).toBe(202);
+    expect(body.message).toBe('Execution queued');
+    expect(body.jobId).toBeDefined();
   });
 });

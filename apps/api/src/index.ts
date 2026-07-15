@@ -21,6 +21,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { decrypt } from './services/encryption.js';
 import authRoutes from './routes/auth.js';
 import { actionRoutes } from './routes/actions.js';
+import { initQueue, closeQueue } from './services/job-queue.js';
 import { getAuditEventsByProject, recordAuditEvent, getAllAuditEvents } from './services/audit.js';
 import {
   resolveDevUser,
@@ -112,6 +113,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(fastifyWebsocket);
+
+  const redisUrl = ('redisUrl' in config ? config.redisUrl : '') || 'redis://localhost:6379';
+  initQueue(redisUrl);
+
+  app.addHook('onClose', async () => {
+    await closeQueue();
+  });
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
     app.log.error(error);

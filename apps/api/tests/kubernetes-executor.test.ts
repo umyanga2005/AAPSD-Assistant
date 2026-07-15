@@ -110,6 +110,8 @@ describe('Policy Test: Kubernetes Deployment Restart', () => {
 describe('Executor Test: executeKubernetesRestart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDb.limit.mockReset();
+    mockDb.limit.mockReturnThis();
   });
 
   it('successfully executes an approved staging plan', async () => {
@@ -186,6 +188,8 @@ describe('Integration Test: POST /action-plans/:id/execute (Kubernetes Restart)'
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockDb.limit.mockReset();
+    mockDb.limit.mockReturnThis();
     app = Fastify();
 
     app.addHook('preHandler', async (request: unknown) => {
@@ -227,9 +231,10 @@ describe('Integration Test: POST /action-plans/:id/execute (Kubernetes Restart)'
       url: '/action-plans/00000000-0000-0000-0000-000000000002/execute',
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(202);
     const body = JSON.parse(response.body);
-    expect(body.status).toBe('succeeded');
+    expect(body.message).toBe('Execution queued');
+    expect(body.jobId).toBeDefined();
   });
 });
 
@@ -277,6 +282,8 @@ describe('Policy Test: Kubernetes Deployment Scale', () => {
 describe('Executor Test: executeKubernetesScale', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDb.limit.mockReset();
+    mockDb.limit.mockReturnThis();
   });
 
   it('successfully executes an approved staging scale plan', async () => {
