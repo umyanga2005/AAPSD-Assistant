@@ -19,7 +19,14 @@ describe('PipelinesPage', () => {
   });
 
   it('shows error state when API call fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/github/repos'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ repos: ['mock/repo'] }),
+        } as Response);
+      return Promise.reject(new Error('Network error'));
+    }) as unknown as typeof fetch;
 
     render(<PipelinesPage />);
 
@@ -28,15 +35,31 @@ describe('PipelinesPage', () => {
   });
 
   const mockData = [
-    { id: '1', name: 'Deploy to Staging', status: 'failed', conclusion: 'failure', failed_jobs: [{ name: 'Build', step: 'Pull image', exit_code: 1 }] },
+    {
+      id: '1',
+      name: 'Deploy to Staging',
+      status: 'failed',
+      conclusion: 'failure',
+      failed_jobs: [{ name: 'Build', step: 'Pull image', exit_code: 1 }],
+    },
     { id: '2', name: 'Deploy to Staging', status: 'completed', conclusion: 'success' },
     { id: '3', name: 'CI Checks', status: 'completed', conclusion: 'success' },
     { id: '4', name: 'Nightly', status: 'in_progress' },
-    { id: '5', name: 'Linter', status: 'queued' }
+    { id: '5', name: 'Linter', status: 'queued' },
   ];
 
   it('renders pipeline status badges', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/github/repos'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ repos: ['mock/repo'] }),
+        } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: mockData }),
+      } as Response);
+    }) as unknown as typeof fetch;
 
     render(<PipelinesPage />);
 
@@ -47,7 +70,17 @@ describe('PipelinesPage', () => {
   });
 
   it('renders failed job summaries', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/github/repos'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ repos: ['mock/repo'] }),
+        } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: mockData }),
+      } as Response);
+    }) as unknown as typeof fetch;
 
     render(<PipelinesPage />);
 
@@ -56,7 +89,17 @@ describe('PipelinesPage', () => {
   });
 
   it('renders diagnosis links', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: mockData }) });
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/github/repos'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ repos: ['mock/repo'] }),
+        } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: mockData }),
+      } as Response);
+    }) as unknown as typeof fetch;
 
     render(<PipelinesPage />);
 
@@ -65,10 +108,14 @@ describe('PipelinesPage', () => {
   });
 
   it('shows empty state when API returns no data', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: [] }),
-    });
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/github/repos'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ repos: ['mock/repo'] }),
+        } as Response);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) } as Response);
+    }) as unknown as typeof fetch;
 
     render(<PipelinesPage />);
 

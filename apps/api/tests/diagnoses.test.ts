@@ -130,7 +130,7 @@ describe('POST /api/v1/diagnoses', () => {
 
     expect(response.statusCode).toBe(401);
     const body = JSON.parse(response.body);
-    expect(body.error).toMatch(/X-Dev-User-Id/);
+    expect(body.error).toMatch(/provide Authorization header/);
     await app.close();
   });
 

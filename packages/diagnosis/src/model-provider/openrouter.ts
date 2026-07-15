@@ -11,9 +11,7 @@ export class OpenRouterModelProvider implements ModelProvider {
     this.timeoutMs = options?.timeoutMs ?? 60_000;
 
     if (!this.apiKey) {
-      throw new Error(
-        'GROQ_API_KEY environment variable is required for the Groq provider',
-      );
+      throw new Error('GROQ_API_KEY environment variable is required for the Groq provider');
     }
   }
 
@@ -50,12 +48,12 @@ export class OpenRouterModelProvider implements ModelProvider {
       }
 
       let jsonString = content.trim();
-      if (jsonString.startsWith('\`\`\`json')) {
+      if (jsonString.startsWith('```json')) {
         jsonString = jsonString.slice(7);
-      } else if (jsonString.startsWith('\`\`\`')) {
+      } else if (jsonString.startsWith('```')) {
         jsonString = jsonString.slice(3);
       }
-      if (jsonString.endsWith('\`\`\`')) {
+      if (jsonString.endsWith('```')) {
         jsonString = jsonString.slice(0, -3);
       }
       return JSON.parse(jsonString.trim()) as unknown;

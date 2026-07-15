@@ -7,6 +7,7 @@ interface PipelineRun {
   status: 'success' | 'failed' | 'running' | 'pending';
   branch: string;
   commitSha: string;
+  repo: string;
   duration: string;
   triggeredAt: string;
   failedJobs: { name: string; step: string; exitCode: number }[];
@@ -21,6 +22,7 @@ interface ApiPipelineRun {
   branch?: string;
   commit_sha?: string;
   head_sha?: string;
+  repo?: string;
   duration?: string;
   triggered_at?: string;
   createdAt?: string;
@@ -40,6 +42,7 @@ function normalizeRun(raw: ApiPipelineRun): PipelineRun {
     status: (normalizedStatus || 'pending') as PipelineRun['status'],
     branch: raw.branch || 'main',
     commitSha: raw.commit_sha || raw.head_sha || '0000000',
+    repo: raw.repo || 'Unknown Repo',
     duration: raw.duration || '0s',
     triggeredAt: raw.triggered_at || raw.createdAt || new Date().toISOString(),
     failedJobs: (raw.failed_jobs ?? []).map((j) => ({
@@ -73,8 +76,37 @@ type ViewState = 'loading' | 'success' | 'error';
 export default function PipelinesPage() {
   const [viewState, setViewState] = useState<ViewState>('loading');
   const [pipelines, setPipelines] = useState<PipelineRun[]>([]);
+  const [repos, setRepos] = useState<string[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<string>('');
+  const [page, setPage] = useState(1);
 
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRepos() {
+      try {
+        const res = await fetchWithAuth(`${apiUrl}/api/github/repos`);
+        if (res.ok) {
+          const body = await res.json();
+          if (!cancelled && body.repos) {
+            setRepos(body.repos);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load repos', err);
+        if (!cancelled) {
+          setRepos([]);
+        }
+      }
+    }
+    loadRepos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +114,12 @@ export default function PipelinesPage() {
     async function load() {
       setViewState('loading');
       try {
-        const response = await fetchWithAuth(`${apiUrl}/api/pipelines`);
+        const queryParams = new URLSearchParams();
+        if (selectedRepo) queryParams.append('repo', selectedRepo);
+        queryParams.append('page', page.toString());
+        queryParams.append('limit', '10');
+
+        const response = await fetchWithAuth(`${apiUrl}/api/pipelines?${queryParams.toString()}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const body = (await response.json()) as { data: ApiPipelineRun[] };
         if (cancelled) return;
@@ -100,7 +137,7 @@ export default function PipelinesPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiUrl]);
+  }, [apiUrl, selectedRepo, page]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -129,6 +166,27 @@ export default function PipelinesPage() {
             Workflow runs, status, duration, and failed job summaries.
           </p>
         </div>
+
+        {repos.length > 0 && (
+          <div className="flex items-center gap-3">
+            <label className="text-brand-muted text-sm font-medium">Repository:</label>
+            <select
+              value={selectedRepo}
+              onChange={(e) => {
+                setSelectedRepo(e.target.value);
+                setPage(1);
+              }}
+              className="bg-brand-dark/50 border border-brand-primary/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary transition-all"
+            >
+              <option value="">All tracked (first available)</option>
+              {repos.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {viewState === 'loading' && (
@@ -145,9 +203,24 @@ export default function PipelinesPage() {
         </div>
       )}
 
-      {viewState === 'success' && pipelines.length === 0 && (
+      {viewState === 'success' && pipelines.length === 0 && repos.length === 0 && (
+        <div className="glass-panel p-12 rounded-2xl border-brand-primary/30 bg-brand-primary/5 text-center">
+          <p className="text-brand-primary text-xl font-bold mb-2">GitHub Not Connected</p>
+          <p className="text-brand-muted text-lg mb-6">
+            Please connect your GitHub account in the Settings to view your pipelines.
+          </p>
+          <a
+            href="/settings"
+            className="inline-block px-6 py-3 bg-brand-primary text-brand-dark font-bold rounded-lg hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all"
+          >
+            Go to Settings
+          </a>
+        </div>
+      )}
+
+      {viewState === 'success' && pipelines.length === 0 && repos.length > 0 && (
         <div className="glass-panel p-12 rounded-2xl border-brand-border text-center">
-          <p className="text-brand-muted text-lg">No pipeline runs found.</p>
+          <p className="text-brand-muted text-lg">No pipeline runs found for this repository.</p>
         </div>
       )}
 
@@ -172,6 +245,22 @@ export default function PipelinesPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 text-sm text-brand-muted">
+                    <span className="flex items-center gap-1.5 font-medium text-brand-primary/80">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                        />
+                      </svg>
+                      {run.repo}
+                    </span>
                     <span className="flex items-center gap-1.5">
                       <svg
                         className="w-4 h-4"
@@ -278,6 +367,26 @@ export default function PipelinesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {viewState === 'success' && pipelines.length > 0 && (
+        <div className="flex justify-center items-center gap-4 mt-8">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 bg-brand-surface border border-brand-border rounded-lg text-white disabled:opacity-50 hover:bg-brand-surfaceHover transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-brand-muted font-medium">Page {page}</span>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={pipelines.length < 10}
+            className="px-4 py-2 bg-brand-surface border border-brand-border rounded-lg text-white disabled:opacity-50 hover:bg-brand-surfaceHover transition-colors"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

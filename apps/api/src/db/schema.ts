@@ -151,16 +151,72 @@ export const userIntegrations = pgTable(
   'user_integrations',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     provider: varchar('provider', { length: 50 }).notNull(),
     accessToken: text('access_token').notNull(),
     metadata: jsonb('metadata').default({}).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
   },
   (table) => ({
     uiUserIdx: index('idx_user_integrations_user_id').on(table.userId),
     uiProviderIdx: index('idx_user_integrations_provider').on(table.provider),
     uiUnique: uniqueIndex('idx_user_integrations_user_provider').on(table.userId, table.provider),
+  }),
+);
+
+export const incidents = pgTable(
+  'incidents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: varchar('title', { length: 255 }).notNull(),
+    severity: varchar('severity', { length: 20 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull(),
+    description: text('description').notNull(),
+    impactedComponent: varchar('impacted_component', { length: 100 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    incidentStatusIdx: index('idx_incidents_status').on(table.status),
+    incidentSeverityIdx: index('idx_incidents_severity').on(table.severity),
+  }),
+);
+
+export const systemLogs = pgTable(
+  'system_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    level: varchar('level', { length: 20 }).notNull(),
+    message: text('message').notNull(),
+    component: varchar('component', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sysLogLevelIdx: index('idx_system_logs_level').on(table.level),
+    sysLogCreatedAtIdx: index('idx_system_logs_created_at').on(table.createdAt),
+  }),
+);
+
+export const systemConnections = pgTable(
+  'system_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    provider: varchar('provider', { length: 100 }).notNull(),
+    status: varchar('status', { length: 50 }).notNull(),
+    details: text('details'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sysConnProviderIdx: index('idx_system_connections_provider').on(table.provider),
+    sysConnCreatedAtIdx: index('idx_system_connections_created_at').on(table.createdAt),
   }),
 );

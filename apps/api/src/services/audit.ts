@@ -74,3 +74,13 @@ export async function getAuditEventsByProject(projectId: string, limit = 50, off
     .limit(limit)
     .offset(offset);
 }
+
+export async function getAllAuditEvents(limit = 50, offset = 0) {
+  const db = getDb();
+  return db
+    .select()
+    .from(auditEvents)
+    .orderBy(desc(auditEvents.createdAt))
+    .limit(limit)
+    .offset(offset);
+}

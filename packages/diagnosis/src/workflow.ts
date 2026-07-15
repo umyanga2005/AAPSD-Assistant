@@ -101,7 +101,7 @@ export async function runDiagnosis(
   let modelResponse;
   try {
     modelResponse = await analyzeWithModel(prompt, provider);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Model analysis failed:', err);
     return {
       requestId: request.traceId,
@@ -146,12 +146,20 @@ function buildPrompt(
   runbook: unknown,
 ): string {
   const schema = {
-    summary: "string (1-2 sentences)",
-    evidence: [{ source: "string", title: "string", detail: "string", url: "optional string", timestamp: "optional string" }],
-    likely_causes: [{ description: "string", probability: "number 0-1" }],
-    recommendations: [{ action: "string", details: "string" }],
-    confidence: "high | medium | low | insufficient_evidence",
-    needs_human_review: "boolean"
+    summary: 'string (1-2 sentences)',
+    evidence: [
+      {
+        source: 'string',
+        title: 'string',
+        detail: 'string',
+        url: 'optional string',
+        timestamp: 'optional string',
+      },
+    ],
+    likely_causes: [{ description: 'string', probability: 'number 0-1' }],
+    recommendations: [{ action: 'string', details: 'string' }],
+    confidence: 'high | medium | low | insufficient_evidence',
+    needs_human_review: 'boolean',
   };
 
   return `You are a DevOps and infrastructure diagnosis AI.
@@ -160,9 +168,13 @@ Schema:
 ${JSON.stringify(schema, null, 2)}
 
 Request Details:
-${JSON.stringify({
-  query: request.query,
-  evidence,
-  runbook,
-}, null, 2)}`;
+${JSON.stringify(
+  {
+    query: request.query,
+    evidence,
+    runbook,
+  },
+  null,
+  2,
+)}`;
 }

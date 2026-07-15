@@ -13,15 +13,28 @@ const DEV_PROJECT_ID = '00000000-0000-0000-0000-000000000002';
 
 const mockUserLimit = vi.fn();
 const mockUserWhere = vi.fn(() => ({ limit: mockUserLimit }));
-const mockMemberLimit = vi.fn();
-const mockMemberWhere = vi.fn(() => ({ limit: mockMemberLimit }));
+const mockMemberLimit = vi.fn().mockImplementation((...args) => {
+  console.log('mockMemberLimit called', args);
+  return [];
+});
+const mockMemberWhere = vi.fn((...args) => {
+  console.log('mockMemberWhere called', args);
+  return { limit: mockMemberLimit };
+});
 const mockAuditOffset = vi.fn();
 const mockAuditLimit = vi.fn(() => ({ offset: mockAuditOffset }));
 const mockAuditOrderBy = vi.fn(() => ({ limit: mockAuditLimit }));
 const mockAuditWhere = vi.fn(() => ({ orderBy: mockAuditOrderBy }));
-const mockFrom = vi.fn((table: unknown) => {
-  if (table === users) return { where: mockUserWhere };
-  if (table === projectMembers) return { where: mockMemberWhere };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockFrom = vi.fn((table: any) => {
+  const tName =
+    (table && table[Symbol.for('drizzle:Name')]) ||
+    (table && table._ && table._.name) ||
+    (table && table.name) ||
+    '';
+  if (table === users || tName === 'users') return { where: mockUserWhere };
+  if (table === projectMembers || tName === 'project_members' || tName === 'projectMembers')
+    return { where: mockMemberWhere };
   return { where: mockAuditWhere };
 });
 const mockInsertValues = vi.fn();
@@ -143,7 +156,7 @@ describe('GET /api/audit-events (auth)', () => {
 
     expect(response.statusCode).toBe(401);
     const body = JSON.parse(response.body);
-    expect(body.error).toMatch(/X-Dev-User-Id/);
+    expect(body.error).toMatch(/provide Authorization header/);
     await app.close();
   });
 
@@ -163,7 +176,7 @@ describe('GET /api/audit-events (auth)', () => {
 
     expect(response.statusCode).toBe(403);
     const body = JSON.parse(response.body);
-    expect(body.error).toMatch(/insufficient permissions/);
+    expect(body.error).toMatch(/insufficient project role/);
     await app.close();
   });
 

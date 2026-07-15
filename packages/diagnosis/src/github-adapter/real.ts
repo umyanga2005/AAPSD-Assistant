@@ -78,11 +78,11 @@ export class RealGitHubAdapter implements GitHubAdapter {
     let jobs: Job[] = [];
     try {
       jobs = await this.getJobs(repo, runId);
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         source: 'github',
         logs: [],
-        metadata: { error: `Failed to fetch jobs: ${err?.message || String(err)}` },
+        metadata: { error: `Failed to fetch jobs: ${(err as Error)?.message || String(err)}` },
       };
     }
     const failedJobs = jobs.filter((j) => j.conclusion === 'failure');
@@ -116,7 +116,7 @@ export class RealGitHubAdapter implements GitHubAdapter {
     };
   }
 
-  async getWorkflowRuns(repo: string, limit = 5): Promise<WorkflowRun[]> {
+  async getWorkflowRuns(repo: string, limit = 5, page = 1): Promise<WorkflowRun[]> {
     this.checkRepo(repo);
     const data = await this.request<{
       workflow_runs: Array<{
@@ -129,7 +129,7 @@ export class RealGitHubAdapter implements GitHubAdapter {
         created_at: string;
         updated_at: string;
       }>;
-    }>(`/repos/${repo}/actions/runs?per_page=${limit}&page=1`);
+    }>(`/repos/${repo}/actions/runs?per_page=${limit}&page=${page}`);
 
     return data.workflow_runs.map((run) => ({
       id: run.id,
@@ -138,9 +138,18 @@ export class RealGitHubAdapter implements GitHubAdapter {
       conclusion: run.conclusion as WorkflowRun['conclusion'],
       url: run.html_url,
       head_sha: run.head_sha,
+      repo,
       createdAt: run.created_at,
       updatedAt: run.updated_at,
     }));
+  }
+
+  async getUserRepos(): Promise<string[]> {
+    // Fetch all repositories the authenticated user has access to
+    const data = await this.request<Array<{ full_name: string }>>(
+      '/user/repos?per_page=100&sort=updated',
+    );
+    return data.map((r) => r.full_name);
   }
 
   async getJobs(repo: string, runId: number): Promise<Job[]> {

@@ -12,7 +12,7 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prepare": "husky",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {

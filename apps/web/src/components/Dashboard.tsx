@@ -75,10 +75,10 @@ export default function Dashboard() {
 
       ws.onmessage = async (event) => {
         try {
-          const [infraRes, pipeRes] = await Promise.all([
-          fetchWithAuth(`${apiUrl}/api/infrastructure`),
-          fetchWithAuth(`${apiUrl}/api/pipelines`),
-        ]);
+          const [_infraRes, _pipeRes] = await Promise.all([
+            fetchWithAuth(`${apiUrl}/api/infrastructure`),
+            fetchWithAuth(`${apiUrl}/api/pipelines`),
+          ]);
           const message = JSON.parse(event.data);
           if (message.type === 'update') {
             setState(message.payload);

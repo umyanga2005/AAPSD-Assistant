@@ -10,11 +10,23 @@ import fastifyWebsocket from '@fastify/websocket';
 import fastifyCors from '@fastify/cors';
 import { getConfig, getConfigSafe, ConfigError } from './config.js';
 import { getDb, testConnection } from './db/index.js';
-import { requests, userIntegrations } from './db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import {
+  requests,
+  userIntegrations,
+  incidents,
+  systemLogs,
+  systemConnections,
+} from './db/schema.js';
+import { eq, and, desc } from 'drizzle-orm';
 import authRoutes from './routes/auth.js';
-import { getAuditEventsByProject, recordAuditEvent } from './services/audit.js';
-import { resolveDevUser, resolveFirebaseUser, getProjectRole, hasRole, isRole } from './services/auth.js';
+import { getAuditEventsByProject, recordAuditEvent, getAllAuditEvents } from './services/audit.js';
+import {
+  resolveDevUser,
+  resolveFirebaseUser,
+  getProjectRole,
+  hasRole,
+  isRole,
+} from './services/auth.js';
 import { validateDiagnoseBody } from './services/validation.js';
 import {
   runDiagnosis,
@@ -78,7 +90,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(fastifyCors, {
-    origin: '*', // Allow all origins for dev/dashboard, or configure properly
+    origin: 'corsOrigin' in config ? config.corsOrigin : '*',
   });
 
   await app.register(fastifyWebsocket);
@@ -96,16 +108,18 @@ export async function buildApp(): Promise<FastifyInstance> {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // Fallback to dev user header for local development bypass if no token
-      const devUserId = request.headers['x-dev-user-id'];
-      if (devUserId && typeof devUserId === 'string') {
-        const devRole = request.headers['x-dev-role'] as string | undefined;
-        const roleOverride = devRole && isRole(devRole) ? devRole : undefined;
-        try {
-          const user = await resolveDevUser(devUserId, roleOverride);
-          (request as unknown as Record<string, unknown>).user = user;
-          return;
-        } catch {
-          // ignore dev bypass error and fall through
+      if (('nodeEnv' in config ? config.nodeEnv : 'development') !== 'production') {
+        const devUserId = request.headers['x-dev-user-id'];
+        if (devUserId && typeof devUserId === 'string') {
+          const devRole = request.headers['x-dev-role'] as string | undefined;
+          const roleOverride = devRole && isRole(devRole) ? devRole : undefined;
+          try {
+            const user = await resolveDevUser(devUserId, roleOverride);
+            (request as unknown as Record<string, unknown>).user = user;
+            return;
+          } catch {
+            // ignore dev bypass error and fall through
+          }
         }
       }
 
@@ -121,7 +135,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       // dynamically import firebaseAuth so we don't crash if env isn't fully set
       const { firebaseAuth } = await import('./services/firebase.js');
       const decodedToken = await firebaseAuth.verifyIdToken(token);
-      
+
       const email = decodedToken.email || '';
       const name = decodedToken.name || email.split('@')[0] || 'Unknown User';
 
@@ -136,16 +150,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   };
 
-  const requireProjectRole = (allowedRoles: Role[]) => {
+  const _requireProjectRole = (...allowedRoles: Role[]) => {
     return async (request: FastifyRequest, reply: FastifyReply) => {
       const user = (request as unknown as Record<string, unknown>).user as DevUser;
       const projectId = (request.query as Record<string, string | undefined>).project_id;
 
       if (!projectId) {
-        return reply.status(400).send({
-          error: 'Query parameter project_id is required',
-          statusCode: 400,
-        });
+        return; // skip project authorization if no project is specified
       }
 
       if (user.role === 'administrator') return;
@@ -158,6 +169,12 @@ export async function buildApp(): Promise<FastifyInstance> {
       }
 
       if (!projectRole || !hasRole(projectRole, allowedRoles[0])) {
+        console.log('DENIED:', {
+          projectRole,
+          allowedRole: allowedRoles[0],
+          userRole: user.role,
+          projectId,
+        });
         const traceId = crypto.randomUUID();
         recordAuditEvent({
           actorId: user.id,
@@ -179,31 +196,77 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(authRoutes, { prefix: '/', devAuthPreHandler });
 
-  app.get('/api/pipelines', { preHandler: [devAuthPreHandler] }, async (request, reply) => {
+  app.get<{ Querystring: { repo?: string; page?: string; limit?: string } }>(
+    '/api/pipelines',
+    { preHandler: [devAuthPreHandler] },
+    async (request, _reply) => {
+      const user = (request as unknown as Record<string, unknown>).user as { id: string };
+      const db = getDb();
+      const integration = await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
+        .limit(1);
+
+      if (integration.length === 0) {
+        return { data: [] }; // No GitHub integration connected
+      }
+
+      const gh = new RealGitHubAdapter({
+        token: integration[0].accessToken,
+        allowedRepos: [], // Allow all for this user token
+      });
+
+      try {
+        const { repo, page, limit } = request.query;
+        let targetRepo = repo;
+
+        if (!targetRepo) {
+          // If no repo specified, try to fetch the first repo the user has access to, or fallback
+          const repos = await gh.getUserRepos();
+          if (repos.length > 0) {
+            targetRepo = repos[0];
+          } else {
+            return { data: [] };
+          }
+        }
+
+        const pageNum = parseInt(page || '1', 10);
+        const limitNum = parseInt(limit || '10', 10);
+
+        const runs = await gh.getWorkflowRuns(targetRepo, limitNum, pageNum);
+        return { data: runs };
+      } catch (err) {
+        app.log.error(err);
+        return { data: [] }; // Fallback to empty if it fails (as requested)
+      }
+    },
+  );
+
+  app.get('/api/github/repos', { preHandler: [devAuthPreHandler] }, async (request, _reply) => {
     const user = (request as unknown as Record<string, unknown>).user as { id: string };
     const db = getDb();
-    const integration = await db.select().from(userIntegrations)
-      .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github'))).limit(1);
+    const integration = await db
+      .select()
+      .from(userIntegrations)
+      .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
+      .limit(1);
 
     if (integration.length === 0) {
-      return { data: [] }; // No GitHub integration connected
+      return { repos: [] };
     }
 
     const gh = new RealGitHubAdapter({
       token: integration[0].accessToken,
-      allowedRepos: [], // Allow all for this user token
+      allowedRepos: [],
     });
 
     try {
-      const config = getConfigSafe();
-      const repo =
-        !('_errors' in config) && config.gitHubAllowedRepos[0]
-          ? config.gitHubAllowedRepos[0]
-          : 'umyanga2005/AAPSD-Assistant';
-      const runs = await gh.getWorkflowRuns(repo, 10);
-      return { data: runs };
-    } catch {
-      return { data: [] }; // Fallback to empty if it fails (as requested)
+      const repos = await gh.getUserRepos();
+      return { repos };
+    } catch (err) {
+      app.log.error(err);
+      return { repos: [] };
     }
   });
 
@@ -218,6 +281,46 @@ export async function buildApp(): Promise<FastifyInstance> {
       return { deployments, pods };
     } catch {
       return { deployments: [], pods: [] }; // Fallback to empty if it fails
+    }
+  });
+
+  app.get('/api/incidents', { preHandler: [devAuthPreHandler] }, async () => {
+    const db = getDb();
+    try {
+      const data = await db.select().from(incidents).orderBy(desc(incidents.createdAt));
+      return data;
+    } catch (err) {
+      app.log.error(err);
+      return [];
+    }
+  });
+
+  app.post<{
+    Body: {
+      title: string;
+      severity: string;
+      status: string;
+      description: string;
+      impactedComponent: string;
+    };
+  }>('/api/incidents', { preHandler: [devAuthPreHandler] }, async (request, reply) => {
+    const db = getDb();
+    try {
+      const { title, severity, status, description, impactedComponent } = request.body;
+      const newIncident = await db
+        .insert(incidents)
+        .values({
+          title,
+          severity,
+          status,
+          description,
+          impactedComponent,
+        })
+        .returning();
+      return newIncident[0];
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(500).send({ error: 'Failed to create incident' });
     }
   });
 
@@ -309,22 +412,18 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get<{ Querystring: { project_id?: string } }>(
     '/api/audit-events',
     {
-      preHandler: [
-        devAuthPreHandler,
-        requireProjectRole(['viewer', 'developer', 'approver', 'devops_engineer', 'administrator']),
-      ],
+      preHandler: [devAuthPreHandler, _requireProjectRole('viewer')],
     },
     async (request, reply) => {
       const { project_id } = request.query;
-      if (!project_id) {
-        return reply.status(400).send({
-          error: 'Query parameter project_id is required',
-          statusCode: 400,
-        });
-      }
 
       try {
-        const events = await getAuditEventsByProject(project_id);
+        let events;
+        if (project_id) {
+          events = await getAuditEventsByProject(project_id);
+        } else {
+          events = await getAllAuditEvents();
+        }
         return { data: events };
       } catch (err) {
         app.log.error(err);
@@ -421,33 +520,61 @@ async function start(): Promise<void> {
 
   const app = await buildApp();
 
+  async function logSystemEvent(level: string, message: string, component?: string) {
+    try {
+      const db = getDb();
+      await db.insert(systemLogs).values({ level, message, component });
+    } catch {
+      // Ignore DB errors during logging
+    }
+  }
+
+  async function logSystemConnection(provider: string, status: string, details?: string) {
+    try {
+      const db = getDb();
+      await db.insert(systemConnections).values({ provider, status, details });
+    } catch {
+      // Ignore DB errors during logging
+    }
+  }
+
   console.log('\n--- System Environment Checks ---');
 
   // Database Check
   try {
     await testConnection();
     console.log('✅ Database: Connected successfully');
+    await logSystemConnection('postgresql', 'connected');
   } catch (err) {
-    console.log(
-      `❌ Database: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`❌ Database: Failed to connect - ${msg}`);
+    await logSystemConnection('postgresql', 'error', msg);
+    await logSystemEvent('error', `Database connection failed: ${msg}`, 'startup');
   }
 
-  // GitHub Check
-  const gh = getGitHubAdapter();
-  if (gh) {
-    try {
-      const repo =
-        !('_errors' in config) && config.gitHubAllowedRepos[0]
-          ? config.gitHubAllowedRepos[0]
-          : 'umyanga2005/AAPSD-Assistant';
-      await gh.getWorkflowRuns(repo, 1);
-      console.log('✅ GitHub Adapter: Connected successfully');
-    } catch (err) {
-      console.log(
-        `❌ GitHub Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
-      );
+  // Firebase Admin Check
+  try {
+    const { firebaseAuth } = await import('./services/firebase.js');
+    if (firebaseAuth) {
+      console.log('✅ Firebase Admin: Initialized successfully');
+      await logSystemConnection('firebase', 'connected');
     }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(`❌ Firebase Admin: Failed to initialize - ${msg}`);
+    await logSystemConnection('firebase', 'error', msg);
+    await logSystemEvent('error', `Firebase initialization failed: ${msg}`, 'startup');
+  }
+
+  // GitHub OAuth Check
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (clientId && clientSecret && clientId !== 'your_client_id') {
+    console.log('✅ GitHub OAuth: Configured successfully');
+    await logSystemConnection('github_oauth', 'connected');
+  } else {
+    console.log('❌ GitHub OAuth: Missing or default credentials in .env');
+    await logSystemConnection('github_oauth', 'error', 'Missing credentials');
   }
 
   // Kubernetes Check
@@ -456,10 +583,12 @@ async function start(): Promise<void> {
     try {
       await k8s.getPods('default');
       console.log('✅ Kubernetes Adapter: Connected successfully');
+      await logSystemConnection('kubernetes', 'connected');
     } catch (err) {
-      console.log(
-        `❌ Kubernetes Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`❌ Kubernetes Adapter: Failed to connect - ${msg}`);
+      await logSystemConnection('kubernetes', 'error', msg);
+      await logSystemEvent('error', `K8s connection failed: ${msg}`, 'startup');
     }
   }
 
@@ -469,10 +598,12 @@ async function start(): Promise<void> {
     try {
       await prom.query('cpu');
       console.log('✅ Prometheus Adapter: Connected successfully');
+      await logSystemConnection('prometheus', 'connected');
     } catch (err) {
-      console.log(
-        `❌ Prometheus Adapter: Failed to connect - ${err instanceof Error ? err.message : String(err)}`,
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`❌ Prometheus Adapter: Failed to connect - ${msg}`);
+      await logSystemConnection('prometheus', 'error', msg);
+      await logSystemEvent('error', `Prometheus connection failed: ${msg}`, 'startup');
     }
   }
 

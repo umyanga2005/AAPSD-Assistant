@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from 'firebase/auth';
 import { auth, googleProvider } from '../firebase.js';
 
 interface LoginProps {
@@ -11,16 +15,21 @@ export default function Login({ onSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Failed to login');
+    } catch (err: unknown) {
+      setError((err as Error).message || `Failed to ${isRegistering ? 'register' : 'login'}`);
     } finally {
       setLoading(false);
     }
@@ -32,8 +41,8 @@ export default function Login({ onSuccess }: LoginProps) {
     try {
       await signInWithPopup(auth, googleProvider);
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Failed to login with Google');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to login with Google');
     } finally {
       setLoading(false);
     }
@@ -49,7 +58,11 @@ export default function Login({ onSuccess }: LoginProps) {
         <div className="relative z-10">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">AAPSD Assistant</h1>
-            <p className="text-brand-muted text-sm">Sign in to your DevOps workspace</p>
+            <p className="text-brand-muted text-sm">
+              {isRegistering
+                ? 'Create your DevOps workspace account'
+                : 'Sign in to your DevOps workspace'}
+            </p>
           </div>
 
           {error && (
@@ -87,9 +100,25 @@ export default function Login({ onSuccess }: LoginProps) {
               disabled={loading}
               className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white font-medium py-3 px-4 rounded-xl transition-all disabled:opacity-50 mt-4"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading
+                ? isRegistering
+                  ? 'Registering...'
+                  : 'Signing in...'
+                : isRegistering
+                  ? 'Register'
+                  : 'Sign In'}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-brand-primary text-sm hover:underline"
+            >
+              {isRegistering ? 'Already have an account? Sign In' : 'Need an account? Register'}
+            </button>
+          </div>
 
           <div className="mt-6 flex items-center justify-between">
             <hr className="w-full border-brand-primary/20" />

@@ -14,16 +14,23 @@ const DEV_PROJECT_ID = '00000000-0000-0000-0000-000000000002';
 
 const mockUserLimit = vi.fn();
 const mockUserWhere = vi.fn(() => ({ limit: mockUserLimit }));
-const mockMemberLimit = vi.fn();
+const mockMemberLimit = vi.fn().mockResolvedValue([{ role: 'developer' }]);
 const mockMemberWhere = vi.fn(() => ({ limit: mockMemberLimit }));
 const mockAuditOffset = vi.fn();
 const mockAuditLimit = vi.fn(() => ({ offset: mockAuditOffset }));
 const mockAuditOrderBy = vi.fn(() => ({ limit: mockAuditLimit }));
 const mockAuditWhere = vi.fn(() => ({ orderBy: mockAuditOrderBy }));
-const mockFrom = vi.fn((table: unknown) => {
-  if (table === users) return { where: mockUserWhere };
-  if (table === projectMembers) return { where: mockMemberWhere };
-  return { where: mockAuditWhere };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockFrom = vi.fn((table: any) => {
+  const tName =
+    (table && table[Symbol.for('drizzle:Name')]) ||
+    (table && table._ && table._.name) ||
+    (table && table.name) ||
+    '';
+  if (table === users || tName === 'users') return { where: mockUserWhere };
+  if (table === projectMembers || tName === 'project_members' || tName === 'projectMembers')
+    return { where: mockMemberWhere };
+  return { where: mockAuditWhere, orderBy: mockAuditOrderBy };
 });
 const mockInsertValues = vi.fn();
 const mockInsert = vi.fn(() => ({ values: mockInsertValues }));
@@ -194,7 +201,7 @@ describe('getAuditEventsByProject', () => {
 });
 
 describe('GET /api/audit-events', () => {
-  it('returns 400 when project_id is missing', async () => {
+  it('returns 200 and all events when project_id is missing', async () => {
     const { buildApp } = await import('../src/index.js');
     const app = await buildApp();
     const response = await app.inject({
@@ -203,9 +210,9 @@ describe('GET /api/audit-events', () => {
       headers: COMMON_HEADERS,
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
-    expect(body.error).toBe('Query parameter project_id is required');
+    expect(body.data).toBeDefined();
     await app.close();
   });
 

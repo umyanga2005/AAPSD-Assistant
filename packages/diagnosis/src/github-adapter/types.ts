@@ -7,6 +7,7 @@ export interface WorkflowRun {
   conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | null;
   url: string;
   head_sha: string;
+  repo: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,7 +29,8 @@ export interface Job {
 
 export interface GitHubAdapter {
   collectEvidence(pipelineRunId?: string): Promise<CollectedEvidence>;
-  getWorkflowRuns(repo: string, limit?: number): Promise<WorkflowRun[]>;
+  getWorkflowRuns(repo: string, limit?: number, page?: number): Promise<WorkflowRun[]>;
+  getUserRepos(): Promise<string[]>;
   getJobs(repo: string, runId: number): Promise<Job[]>;
   getJobLogs(repo: string, jobId: number): Promise<string[]>;
 }

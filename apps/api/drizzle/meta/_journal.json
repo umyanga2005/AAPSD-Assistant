@@ -29,6 +29,20 @@
       "when": 1784036199977,
       "tag": "0003_flawless_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784039367532,
+      "tag": "0004_kind_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784041264894,
+      "tag": "0005_robust_exiles",
+      "breakpoints": true
     }
   ]
 }

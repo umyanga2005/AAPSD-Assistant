@@ -27,10 +27,15 @@ export class RealK8sAdapter implements K8sAdapter {
     this.token = config.token;
     this.apiServerUrl = config.apiServerUrl ?? 'https://kubernetes.default.svc';
     this.allowedNamespaces = config.allowedNamespaces ?? [];
+    const connectOptions: { rejectUnauthorized?: boolean; ca?: string } = {
+      rejectUnauthorized: true,
+    };
+    if (config.caCert) {
+      connectOptions.ca = config.caCert;
+    }
+
     this.dispatcher = new Agent({
-      connect: {
-        rejectUnauthorized: false,
-      },
+      connect: connectOptions,
     });
   }
 

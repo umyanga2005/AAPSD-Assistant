@@ -13,7 +13,7 @@ interface AuditEvent {
   createdAt: string;
 }
 
-const MOCK_EVENTS: AuditEvent[] = [
+const _MOCK_EVENTS: AuditEvent[] = [
   {
     id: 'evt-1',
     actorId: 'usr-admin-1',
@@ -84,25 +84,22 @@ export default function AuditLogsPage() {
     async function load() {
       setViewState('loading');
       try {
-        const response = await fetchWithAuth(`${apiUrl}/api/audit-events?project_id=mock-project-1`);
+        const response = await fetchWithAuth(`${apiUrl}/api/audit-events`);
 
         if (!response.ok) {
           throw new Error('Fallback to mock');
         }
 
-        const body = (await response.json()) as AuditEvent[];
+        const responseBody = await response.json();
+        const body = responseBody.data as AuditEvent[];
         if (cancelled) return;
 
-        if (body.length > 0) {
-          setEvents(body);
-        } else {
-          setEvents(MOCK_EVENTS);
-        }
+        setEvents(body || []);
         setViewState('success');
-      } catch {
+      } catch (err) {
         if (cancelled) return;
-        setEvents(MOCK_EVENTS);
-        setViewState('success');
+        setViewState('success'); // Fallback to empty if it fails to fetch (simulating no logs)
+        setEvents([]);
       }
     }
 

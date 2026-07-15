@@ -3,13 +3,18 @@ import { getDb } from '../db/index.js';
 import { userIntegrations } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
-export default async function authRoutes(app: FastifyInstance, opts: { devAuthPreHandler: any }) {
+import { FastifyRequest, FastifyReply } from 'fastify';
+
+export default async function authRoutes(
+  app: FastifyInstance,
+  opts: { devAuthPreHandler: (request: FastifyRequest, reply: FastifyReply) => Promise<void> },
+) {
   app.get('/api/auth/github', async (request, reply) => {
     // We need to pass the user ID as state so we know who to attach the token to.
-    // However, OAuth state usually requires session handling or JWTs. 
+    // However, OAuth state usually requires session handling or JWTs.
     // For simplicity, we can pass a dummy state or require the client to pass their Firebase token as a query param.
     // Better yet: Since redirecting leaves the SPA, the user will come back to a generic page.
-    
+
     const clientId = process.env.GITHUB_CLIENT_ID;
     if (!clientId) {
       return reply.status(500).send({ error: 'GitHub Client ID not configured' });
@@ -21,7 +26,7 @@ export default async function authRoutes(app: FastifyInstance, opts: { devAuthPr
   });
 
   app.get('/api/auth/github/callback', async (request, reply) => {
-    const { code, state } = request.query as { code?: string; state?: string };
+    const { code, state: _state } = request.query as { code?: string; state?: string };
 
     if (!code) {
       return reply.status(400).send({ error: 'Missing code parameter' });
@@ -70,7 +75,6 @@ export default async function authRoutes(app: FastifyInstance, opts: { devAuthPr
         </html>
       `;
       reply.type('text/html').send(html);
-
     } catch (err) {
       console.error('GitHub OAuth Error:', err);
       return reply.status(500).send({ error: 'Internal Server Error during GitHub OAuth' });
@@ -78,30 +82,59 @@ export default async function authRoutes(app: FastifyInstance, opts: { devAuthPr
   });
 
   // New endpoint to securely save the token sent by the frontend
-  app.post('/api/auth/github/save', { preHandler: [opts.devAuthPreHandler] }, async (request, reply) => {
-    const { token } = request.body as { token: string };
+  app.post(
+    '/api/auth/github/save',
+    { preHandler: [opts.devAuthPreHandler] },
+    async (request, reply) => {
+      const { token } = request.body as { token: string };
+      const user = (request as unknown as Record<string, unknown>).user as { id: string };
+
+      if (!token) return reply.status(400).send({ error: 'Token is required' });
+
+      const db = getDb();
+
+      // Check if integration exists
+      const existing = await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(userIntegrations)
+          .set({ accessToken: token, updatedAt: new Date() })
+          .where(eq(userIntegrations.id, existing[0].id));
+      } else {
+        await db.insert(userIntegrations).values({
+          userId: user.id,
+          provider: 'github',
+          accessToken: token,
+        });
+      }
+
+      return { success: true };
+    },
+  );
+
+  // Get user integrations
+  app.get('/api/integrations', { preHandler: [opts.devAuthPreHandler] }, async (request, reply) => {
     const user = (request as unknown as Record<string, unknown>).user as { id: string };
-
-    if (!token) return reply.status(400).send({ error: 'Token is required' });
-
     const db = getDb();
-    
-    // Check if integration exists
-    const existing = await db.select().from(userIntegrations)
-      .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github'))).limit(1);
 
-    if (existing.length > 0) {
-      await db.update(userIntegrations)
-        .set({ accessToken: token, updatedAt: new Date() })
-        .where(eq(userIntegrations.id, existing[0].id));
-    } else {
-      await db.insert(userIntegrations).values({
-        userId: user.id,
-        provider: 'github',
-        accessToken: token,
-      });
+    try {
+      const integrations = await db
+        .select({
+          provider: userIntegrations.provider,
+          updatedAt: userIntegrations.updatedAt,
+        })
+        .from(userIntegrations)
+        .where(eq(userIntegrations.userId, user.id));
+
+      return { data: integrations };
+    } catch (err) {
+      console.error('Failed to fetch integrations', err);
+      return reply.status(500).send({ error: 'Failed to fetch integrations' });
     }
-
-    return { success: true };
   });
 }
