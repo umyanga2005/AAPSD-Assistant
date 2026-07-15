@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PolicyEvaluator } from '@aapsd/policy';
 import {
-  executeGitHubWorkflow,
-  MockGitHubExecutorAdapter,
-} from '../src/services/github-executor.js';
+  executeKubernetesRestart,
+  MockKubernetesExecutorAdapter,
+} from '../src/services/kubernetes-executor.js';
 import Fastify from 'fastify';
 import { actionRoutes } from '../src/routes/actions.js';
 import * as audit from '../src/services/audit.js';
@@ -27,10 +27,10 @@ vi.mock('../src/db/index.js', () => ({
 
 vi.mock('../src/config.js', () => ({
   getConfigSafe: vi.fn(() => ({
-    gitHubAllowedRepos: ['owner/allowed-repo'],
-    gitHubAllowedWorkflows: ['deploy.yml'],
-    k8sAllowedNamespaces: [],
-    actionAllowedDeployments: [],
+    gitHubAllowedRepos: [],
+    gitHubAllowedWorkflows: [],
+    k8sAllowedNamespaces: ['staging-ns'],
+    actionAllowedDeployments: ['api-service'],
     actionMinScale: 1,
     actionMaxScale: 5,
     nodeEnv: 'test',
@@ -45,13 +45,13 @@ vi.mock('../src/services/audit.js', async (importOriginal) => {
   };
 });
 
-describe('Policy Test: GitHub Workflow Dispatch', () => {
-  it('allows workflow dispatch for allowed repo and workflow', () => {
+describe('Policy Test: Kubernetes Deployment Restart', () => {
+  it('allows restart for allowed namespace and deployment', () => {
     const evaluator = new PolicyEvaluator({
-      allowedRepos: ['owner/allowed-repo'],
-      allowedWorkflows: ['deploy.yml'],
-      allowedNamespaces: [],
-      allowedDeployments: [],
+      allowedRepos: [],
+      allowedWorkflows: [],
+      allowedNamespaces: ['staging-ns'],
+      allowedDeployments: ['api-service'],
       minScale: 1,
       maxScale: 5,
     });
@@ -59,18 +59,18 @@ describe('Policy Test: GitHub Workflow Dispatch', () => {
     const result = evaluator.evaluate({
       environmentName: 'staging',
       userRole: 'developer',
-      actionType: 'github.workflow.dispatch',
-      args: { repo: 'owner/allowed-repo', workflowId: 'deploy.yml', ref: 'main' },
+      actionType: 'kubernetes.deployment.restart',
+      args: { namespace: 'staging-ns', deploymentName: 'api-service' },
     });
     expect(result.allowed).toBe(true);
   });
 
-  it('rejects workflow dispatch for unlisted repo', () => {
+  it('rejects restart for invalid namespace', () => {
     const evaluator = new PolicyEvaluator({
-      allowedRepos: ['owner/allowed-repo'],
-      allowedWorkflows: ['deploy.yml'],
-      allowedNamespaces: [],
-      allowedDeployments: [],
+      allowedRepos: [],
+      allowedWorkflows: [],
+      allowedNamespaces: ['staging-ns'],
+      allowedDeployments: ['api-service'],
       minScale: 1,
       maxScale: 5,
     });
@@ -78,15 +78,35 @@ describe('Policy Test: GitHub Workflow Dispatch', () => {
     const result = evaluator.evaluate({
       environmentName: 'staging',
       userRole: 'developer',
-      actionType: 'github.workflow.dispatch',
-      args: { repo: 'owner/hacked-repo', workflowId: 'deploy.yml', ref: 'main' },
+      actionType: 'kubernetes.deployment.restart',
+      args: { namespace: 'kube-system', deploymentName: 'api-service' },
     });
     expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('Repository not in allowlist');
+    expect(result.reason).toContain('Namespace not in allowlist');
+  });
+
+  it('rejects restart for invalid deployment', () => {
+    const evaluator = new PolicyEvaluator({
+      allowedRepos: [],
+      allowedWorkflows: [],
+      allowedNamespaces: ['staging-ns'],
+      allowedDeployments: ['api-service'],
+      minScale: 1,
+      maxScale: 5,
+    });
+
+    const result = evaluator.evaluate({
+      environmentName: 'staging',
+      userRole: 'developer',
+      actionType: 'kubernetes.deployment.restart',
+      args: { namespace: 'staging-ns', deploymentName: 'vault' },
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('Deployment not in allowlist');
   });
 });
 
-describe('Executor Test: executeGitHubWorkflow', () => {
+describe('Executor Test: executeKubernetesRestart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -97,20 +117,22 @@ describe('Executor Test: executeGitHubWorkflow', () => {
         id: 'plan-1',
         projectId: 'proj-1',
         environmentId: 'env-1',
-        actionType: 'github.workflow.dispatch',
+        actionType: 'kubernetes.deployment.restart',
         status: 'approved',
-        typedArgs: { repo: 'owner/allowed-repo', workflowId: 'deploy.yml', ref: 'main' },
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service' },
       },
     ]);
     mockDb.limit.mockResolvedValueOnce([{ name: 'staging' }]); // environment
     mockDb.limit.mockResolvedValueOnce([{ role: 'devops_engineer' }]); // user role
 
-    const result = await executeGitHubWorkflow('plan-1', 'user-1', new MockGitHubExecutorAdapter());
+    const result = await executeKubernetesRestart(
+      'plan-1',
+      'user-1',
+      new MockKubernetesExecutorAdapter(),
+    );
 
     expect(result.status).toBe('succeeded');
-    // Expect audit events queued, running, succeeded
     expect(audit.recordAuditEvent).toHaveBeenCalledTimes(3);
-    // Expect db.update to be called to set queued, running, succeeded
     expect(mockDb.update).toHaveBeenCalledTimes(3);
   });
 
@@ -122,9 +144,21 @@ describe('Executor Test: executeGitHubWorkflow', () => {
       },
     ]);
 
-    await expect(executeGitHubWorkflow('plan-1', 'user-1')).rejects.toThrow(
-      'Plan is not approved (current status: pending)',
+    await expect(executeKubernetesRestart('plan-1', 'user-1')).rejects.toThrow(
+      'Plan is not approved',
     );
+  });
+
+  it('rejects execution for expired plan', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-1',
+        status: 'approved',
+        expiresAt: new Date(Date.now() - 10000).toISOString(),
+      },
+    ]);
+
+    await expect(executeKubernetesRestart('plan-1', 'user-1')).rejects.toThrow('Plan has expired');
   });
 
   it('rejects execution for production environment', async () => {
@@ -133,20 +167,20 @@ describe('Executor Test: executeGitHubWorkflow', () => {
         id: 'plan-1',
         projectId: 'proj-1',
         environmentId: 'env-1',
-        actionType: 'github.workflow.dispatch',
+        actionType: 'kubernetes.deployment.restart',
         status: 'approved',
-        typedArgs: { repo: 'owner/allowed-repo', workflowId: 'deploy.yml', ref: 'main' },
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service' },
       },
     ]);
     mockDb.limit.mockResolvedValueOnce([{ name: 'production' }]); // environment
 
-    await expect(executeGitHubWorkflow('plan-1', 'user-1')).rejects.toThrow(
+    await expect(executeKubernetesRestart('plan-1', 'user-1')).rejects.toThrow(
       'Execution is only permitted in the staging environment',
     );
   });
 });
 
-describe('Integration Test: POST /action-plans/:id/execute', () => {
+describe('Integration Test: POST /action-plans/:id/execute (Kubernetes Restart)', () => {
   let app: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
@@ -160,27 +194,28 @@ describe('Integration Test: POST /action-plans/:id/execute', () => {
     await app.register(actionRoutes);
   });
 
-  it('returns 200 and executes plan', async () => {
-    // Mock for actions.ts fetch
+  it('returns 200 and executes kubernetes restart plan', async () => {
+    // For execute action plan endpoint
     mockDb.limit.mockResolvedValueOnce([
       {
-        id: '00000000-0000-0000-0000-000000000001',
+        id: '00000000-0000-0000-0000-000000000002',
         projectId: 'proj-1',
         environmentId: 'env-1',
-        actionType: 'github.workflow.dispatch',
+        actionType: 'kubernetes.deployment.restart',
         status: 'approved',
-        typedArgs: { repo: 'owner/allowed-repo', workflowId: 'deploy.yml', ref: 'main' },
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service' },
       },
     ]);
-    // Mock for executeGitHubWorkflow plan fetch
+
+    // For executeKubernetesRestart internals
     mockDb.limit.mockResolvedValueOnce([
       {
-        id: '00000000-0000-0000-0000-000000000001',
+        id: '00000000-0000-0000-0000-000000000002',
         projectId: 'proj-1',
         environmentId: 'env-1',
-        actionType: 'github.workflow.dispatch',
+        actionType: 'kubernetes.deployment.restart',
         status: 'approved',
-        typedArgs: { repo: 'owner/allowed-repo', workflowId: 'deploy.yml', ref: 'main' },
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service' },
       },
     ]);
     mockDb.limit.mockResolvedValueOnce([{ name: 'staging' }]); // environment
@@ -188,11 +223,11 @@ describe('Integration Test: POST /action-plans/:id/execute', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/action-plans/00000000-0000-0000-0000-000000000001/execute',
+      url: '/action-plans/00000000-0000-0000-0000-000000000002/execute',
     });
 
-    const body = JSON.parse(response.body);
     expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
     expect(body.status).toBe('succeeded');
   });
 });

@@ -13,6 +13,7 @@ import {
   recordAuditEvent,
 } from '../services/audit.js';
 import { executeGitHubWorkflow } from '../services/github-executor.js';
+import { executeKubernetesRestart } from '../services/kubernetes-executor.js';
 
 export const actionRoutes: FastifyPluginAsync = async (app) => {
   const configResult = getConfigSafe();
@@ -329,7 +330,23 @@ export const actionRoutes: FastifyPluginAsync = async (app) => {
       }
 
       try {
-        const result = await executeGitHubWorkflow(request.params.id, user.id);
+        const db = getDb();
+        const plan = await db
+          .select()
+          .from(actionPlans)
+          .where(eq(actionPlans.id, request.params.id))
+          .limit(1);
+        if (plan.length === 0) return reply.status(404).send({ error: 'Plan not found' });
+
+        let result;
+        if (plan[0].actionType === 'github.workflow.dispatch') {
+          result = await executeGitHubWorkflow(request.params.id, user.id);
+        } else if (plan[0].actionType === 'kubernetes.deployment.restart') {
+          result = await executeKubernetesRestart(request.params.id, user.id);
+        } else {
+          return reply.status(400).send({ error: 'Unsupported action type for execution' });
+        }
+
         return reply.status(200).send(result);
       } catch (error: unknown) {
         const err = error as Error;
