@@ -19,6 +19,7 @@
     "@aapsd/contracts": "*",
     "@aapsd/diagnosis": "*",
     "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/websocket": "^11.3.0",
     "@sinclair/typebox": "^0.34.52",
     "bullmq": "^5.80.3",

@@ -18,6 +18,7 @@ export interface AppConfig {
   dockerDaemonUrl?: string;
   terraformApiUrl?: string;
   terraformToken?: string;
+  webhookSecret?: string;
 }
 
 export class ConfigError extends Error {
@@ -116,6 +117,7 @@ export function getConfig(): AppConfig {
   const dockerDaemonUrl = process.env.DOCKER_DAEMON_URL || undefined;
   const terraformApiUrl = process.env.TERRAFORM_API_URL || undefined;
   const terraformToken = process.env.TERRAFORM_TOKEN || undefined;
+  const webhookSecret = process.env.WEBHOOK_SECRET || undefined;
 
   if (errors.length > 0) {
     throw new ConfigError(errors);
@@ -141,6 +143,7 @@ export function getConfig(): AppConfig {
     dockerDaemonUrl,
     terraformApiUrl,
     terraformToken,
+    webhookSecret,
   };
 }
 

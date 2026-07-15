@@ -8,6 +8,7 @@ import Fastify, {
 } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyCors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { getConfig, getConfigSafe, ConfigError } from './config.js';
 import { getDb, testConnection } from './db/index.js';
 import {
@@ -21,6 +22,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { decrypt } from './services/encryption.js';
 import authRoutes from './routes/auth.js';
 import { actionRoutes } from './routes/actions.js';
+import { webhookRoutes } from './routes/webhooks.js';
 import { initQueue, closeQueue } from './services/job-queue.js';
 import { getAuditEventsByProject, recordAuditEvent, getAllAuditEvents } from './services/audit.js';
 import {
@@ -105,7 +107,29 @@ export async function buildApp(): Promise<FastifyInstance> {
   setTerraformAdapter(terraformAdapter);
 
   const app = Fastify({
-    logger: true,
+    logger: {
+      redact: {
+        paths: [
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'password',
+          'token',
+          'secret',
+          'req.headers["x-hub-signature-256"]',
+        ],
+        censor: '[REDACTED]',
+      },
+    },
+  });
+
+  await app.register(fastifyRateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Rate limit exceeded, please try again later.',
+    }),
   });
 
   await app.register(fastifyCors, {
@@ -233,6 +257,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     { prefix: '/api' },
   );
+
+  app.register(webhookRoutes, { prefix: '/api/webhooks' });
 
   app.get<{ Querystring: { project_id?: string; repo?: string; page?: string; limit?: string } }>(
     '/api/pipelines',

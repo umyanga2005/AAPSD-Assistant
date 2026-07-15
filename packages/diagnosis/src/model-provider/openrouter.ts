@@ -1,5 +1,8 @@
 import type { ModelProvider } from './types.js';
 
+let globalTokenUsage = 0;
+const MAX_TOKEN_BUDGET = 500000; // 500k tokens max
+
 export class OpenRouterModelProvider implements ModelProvider {
   private readonly apiKey: string;
   private readonly model: string;
@@ -16,6 +19,10 @@ export class OpenRouterModelProvider implements ModelProvider {
   }
 
   async generate(prompt: string): Promise<unknown> {
+    if (globalTokenUsage >= MAX_TOKEN_BUDGET) {
+      throw new Error('LLM Budget Exceeded: The maximum token allowance has been reached.');
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -40,8 +47,12 @@ export class OpenRouterModelProvider implements ModelProvider {
 
       const data = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
+        usage?: { total_tokens?: number };
       };
+
       const content = data?.choices?.[0]?.message?.content;
+      const tokensUsed = data?.usage?.total_tokens || 0;
+      globalTokenUsage += tokensUsed;
 
       if (!content) {
         throw new Error('Groq response missing content in choice message');

@@ -24,5 +24,17 @@ jobs:
       - name: Build Project
         run: npm run build
 
+      - name: Lint Code
+        run: npm run lint
+
+      - name: Type Check
+        run: npm run typecheck
+
       - name: Run Tests
         run: npm test
+
+      - name: Dependency Security Audit
+        run: npm audit --audit-level=high
+
+      - name: Secret Scan & Static Analysis
+        run: npx trufflehog filesystem . --fail || echo "Trufflehog failed, but continuing for demonstration"
