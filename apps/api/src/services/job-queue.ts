@@ -2,6 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { executeGitHubWorkflow } from './github-executor.js';
 import { executeKubernetesRestart, executeKubernetesScale } from './kubernetes-executor.js';
+import { apiExecutorJobsTotal, apiQueueDepthTotal } from '../index.js';
 
 let connection: IORedis | undefined;
 let executionQueue: Queue | undefined;
@@ -55,6 +56,7 @@ export function initQueue(redisUrl: string) {
         }
 
         const result = await Promise.race([executionPromise, timeoutPromise]);
+        apiExecutorJobsTotal.inc({ status: 'success' });
         return result;
       } catch (err: unknown) {
         const error = err as Error;
@@ -68,6 +70,7 @@ export function initQueue(redisUrl: string) {
           // Do not retry these failures
           job.discard(); // Mark as dead-letter
         }
+        apiExecutorJobsTotal.inc({ status: 'failed' });
         throw error;
       }
     },
@@ -110,6 +113,9 @@ export async function getJobStatus(jobId: string) {
   const progress = job.progress;
   const failedReason = job.failedReason;
   const returnvalue = job.returnvalue;
+
+  const count = await executionQueue.getWaitingCount();
+  apiQueueDepthTotal.set(count);
 
   return {
     id: job.id,

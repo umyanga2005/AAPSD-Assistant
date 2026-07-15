@@ -23,7 +23,8 @@ const mockSelect = vi.fn(() => ({ from: mockFrom }));
 const mockDb = {
   insert: mockInsert,
   select: mockSelect,
-} as unknown as NodePgDatabase<typeof schema>;
+  $client: {} as unknown,
+} as unknown as ReturnType<typeof dbModule.getDb>;
 
 describe('Security Controls & Hardening', () => {
   let app: FastifyInstance;

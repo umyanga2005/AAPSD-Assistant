@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import * as client from 'prom-client';
 import Fastify, {
   type FastifyInstance,
   type FastifyError,
@@ -63,6 +64,37 @@ function createModelProvider(): ModelProvider {
   return new FakeModelProvider();
 }
 
+client.collectDefaultMetrics();
+
+export const apiHttpRequestDurationSeconds = new client.Histogram({
+  name: 'api_http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+});
+
+export const apiIntegrationErrorsTotal = new client.Counter({
+  name: 'api_integration_errors_total',
+  help: 'Total number of integration errors',
+  labelNames: ['integration_type'],
+});
+
+export const apiExecutorJobsTotal = new client.Counter({
+  name: 'api_executor_jobs_total',
+  help: 'Total number of executor jobs',
+  labelNames: ['status'],
+});
+
+export const apiQueueDepthTotal = new client.Gauge({
+  name: 'api_queue_depth_total',
+  help: 'Total number of jobs in the queue',
+});
+
+export const apiLlmUsageTokensTotal = new client.Counter({
+  name: 'api_llm_usage_tokens_total',
+  help: 'Total number of LLM tokens used',
+  labelNames: ['model'],
+});
+
 export async function buildApp(): Promise<FastifyInstance> {
   const modelProvider = createModelProvider();
   const config = getConfigSafe();
@@ -107,6 +139,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   setTerraformAdapter(terraformAdapter);
 
   const app = Fastify({
+    genReqId: () => crypto.randomUUID(),
     logger: {
       redact: {
         paths: [
@@ -143,6 +176,25 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.addHook('onClose', async () => {
     await closeQueue();
+  });
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    reply.header('x-trace-id', request.id);
+    return payload;
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const route = request.routeOptions.url;
+    if (route !== '/metrics' && route !== '/api/v1/health') {
+      apiHttpRequestDurationSeconds.observe(
+        {
+          method: request.method,
+          route: route || 'unknown',
+          status_code: reply.statusCode,
+        },
+        reply.elapsedTime / 1000,
+      );
+    }
   });
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -259,6 +311,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   );
 
   app.register(webhookRoutes, { prefix: '/api/webhooks' });
+
+  app.get('/metrics', async (request, reply) => {
+    reply.header('Content-Type', client.register.contentType);
+    return client.register.metrics();
+  });
+
+  app.get('/api/v1/health', async (request, reply) => {
+    const isDbConnected = await testConnection();
+    if (!isDbConnected) {
+      return reply.status(503).send({ status: 'error', db: 'disconnected' });
+    }
+    return reply.status(200).send({ status: 'ok', db: 'connected' });
+  });
 
   app.get<{ Querystring: { project_id?: string; repo?: string; page?: string; limit?: string } }>(
     '/api/pipelines',
