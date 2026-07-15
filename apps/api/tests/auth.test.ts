@@ -48,7 +48,8 @@ const mockDb: NodePgDatabase<typeof schema> = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(dbModule.getDb).mockReturnValue(mockDb);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(dbModule.getDb).mockReturnValue(mockDb as any);
   mockInsertValues.mockResolvedValue(undefined);
 });
 

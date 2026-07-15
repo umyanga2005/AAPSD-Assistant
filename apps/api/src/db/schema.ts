@@ -170,6 +170,21 @@ export const userIntegrations = pgTable(
   }),
 );
 
+export const oauthStates = pgTable(
+  'oauth_states',
+  {
+    state: varchar('state', { length: 64 }).primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: varchar('provider', { length: 50 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    osUserIdx: index('idx_oauth_states_user_id').on(table.userId),
+  }),
+);
+
 export const incidents = pgTable(
   'incidents',
   {

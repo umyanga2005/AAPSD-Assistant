@@ -1,36 +1,80 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getDb } from '../db/index.js';
-import { userIntegrations } from '../db/schema.js';
+import { userIntegrations, oauthStates } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
-
-import { FastifyRequest, FastifyReply } from 'fastify';
+import crypto from 'crypto';
+import { encrypt } from '../services/encryption.js';
 
 export default async function authRoutes(
   app: FastifyInstance,
   opts: { devAuthPreHandler: (request: FastifyRequest, reply: FastifyReply) => Promise<void> },
 ) {
-  app.get('/api/auth/github', async (request, reply) => {
-    // We need to pass the user ID as state so we know who to attach the token to.
-    // However, OAuth state usually requires session handling or JWTs.
-    // For simplicity, we can pass a dummy state or require the client to pass their Firebase token as a query param.
-    // Better yet: Since redirecting leaves the SPA, the user will come back to a generic page.
+  // 1. Authenticated endpoint to generate OAuth URL and state
+  app.get(
+    '/api/auth/github/url',
+    { preHandler: [opts.devAuthPreHandler] },
+    async (request, reply) => {
+      const user = (request as unknown as Record<string, unknown>).user as { id: string };
 
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    if (!clientId) {
-      return reply.status(500).send({ error: 'GitHub Client ID not configured' });
-    }
+      const clientId = process.env.GITHUB_CLIENT_ID;
+      if (!clientId) {
+        return reply.status(500).send({ error: 'GitHub Client ID not configured' });
+      }
 
-    // In a real app, state should be a cryptographically secure random string linked to the user's session
-    const redirectUri = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo,read:org&state=redirecting`;
-    return reply.redirect(redirectUri);
-  });
+      // Generate secure state
+      const state = crypto.randomBytes(32).toString('hex');
+      const db = getDb();
 
+      // Store state linked to user
+      await db.insert(oauthStates).values({
+        state,
+        userId: user.id,
+        provider: 'github',
+      });
+
+      // We only need the 'repo' scope for pipelines (actions), or 'repo:status' depending on exact needs,
+      // but 'repo' is standard for GitHub apps managing CI/CD.
+      const redirectUri = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&state=${state}`;
+      return { url: redirectUri };
+    },
+  );
+
+  // 2. Callback from GitHub
   app.get('/api/auth/github/callback', async (request, reply) => {
-    const { code, state: _state } = request.query as { code?: string; state?: string };
+    const { code, state } = request.query as { code?: string; state?: string };
+    const targetOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
-    if (!code) {
-      return reply.status(400).send({ error: 'Missing code parameter' });
+    if (!code || !state) {
+      return reply.type('text/html').send(`
+        <script>
+          window.opener.postMessage({ type: 'GITHUB_OAUTH_ERROR', error: 'Missing code or state' }, '${targetOrigin}');
+          window.close();
+        </script>
+      `);
     }
+
+    const db = getDb();
+
+    // Validate state
+    const stateRecord = await db
+      .select()
+      .from(oauthStates)
+      .where(eq(oauthStates.state, state))
+      .limit(1);
+
+    if (stateRecord.length === 0) {
+      return reply.type('text/html').send(`
+        <script>
+          window.opener.postMessage({ type: 'GITHUB_OAUTH_ERROR', error: 'Invalid or expired state' }, '${targetOrigin}');
+          window.close();
+        </script>
+      `);
+    }
+
+    const { userId } = stateRecord[0];
+
+    // Delete state so it can't be replayed
+    await db.delete(oauthStates).where(eq(oauthStates.state, state));
 
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
@@ -57,17 +101,45 @@ export default async function authRoutes(
       const tokenData = await tokenResponse.json();
 
       if (tokenData.error) {
-        return reply.status(400).send({ error: tokenData.error_description || tokenData.error });
+        return reply.type('text/html').send(`
+          <script>
+            window.opener.postMessage({ type: 'GITHUB_OAUTH_ERROR', error: '${tokenData.error_description || tokenData.error}' }, '${targetOrigin}');
+            window.close();
+          </script>
+        `);
       }
 
       const accessToken = tokenData.access_token;
 
-      // Send the token back to the main window
+      // Encrypt the token at rest
+      const encryptedToken = encrypt(accessToken);
+
+      // Save to user_integrations directly
+      const existing = await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.provider, 'github')))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(userIntegrations)
+          .set({ accessToken: encryptedToken, updatedAt: new Date() })
+          .where(eq(userIntegrations.id, existing[0].id));
+      } else {
+        await db.insert(userIntegrations).values({
+          userId,
+          provider: 'github',
+          accessToken: encryptedToken,
+        });
+      }
+
+      // Send success message to the frontend (without the token)
       const html = `
         <html>
           <body>
             <script>
-              window.opener.postMessage({ type: 'GITHUB_OAUTH_SUCCESS', token: '${accessToken}' }, '*');
+              window.opener.postMessage({ type: 'GITHUB_OAUTH_SUCCESS' }, '${targetOrigin}');
               window.close();
             </script>
             <p>Authentication successful! You can close this window.</p>
@@ -77,45 +149,14 @@ export default async function authRoutes(
       reply.type('text/html').send(html);
     } catch (err) {
       console.error('GitHub OAuth Error:', err);
-      return reply.status(500).send({ error: 'Internal Server Error during GitHub OAuth' });
+      return reply.type('text/html').send(`
+        <script>
+          window.opener.postMessage({ type: 'GITHUB_OAUTH_ERROR', error: 'Internal Server Error during GitHub OAuth' }, '${targetOrigin}');
+          window.close();
+        </script>
+      `);
     }
   });
-
-  // New endpoint to securely save the token sent by the frontend
-  app.post(
-    '/api/auth/github/save',
-    { preHandler: [opts.devAuthPreHandler] },
-    async (request, reply) => {
-      const { token } = request.body as { token: string };
-      const user = (request as unknown as Record<string, unknown>).user as { id: string };
-
-      if (!token) return reply.status(400).send({ error: 'Token is required' });
-
-      const db = getDb();
-
-      // Check if integration exists
-      const existing = await db
-        .select()
-        .from(userIntegrations)
-        .where(and(eq(userIntegrations.userId, user.id), eq(userIntegrations.provider, 'github')))
-        .limit(1);
-
-      if (existing.length > 0) {
-        await db
-          .update(userIntegrations)
-          .set({ accessToken: token, updatedAt: new Date() })
-          .where(eq(userIntegrations.id, existing[0].id));
-      } else {
-        await db.insert(userIntegrations).values({
-          userId: user.id,
-          provider: 'github',
-          accessToken: token,
-        });
-      }
-
-      return { success: true };
-    },
-  );
 
   // Get user integrations
   app.get('/api/integrations', { preHandler: [opts.devAuthPreHandler] }, async (request, reply) => {

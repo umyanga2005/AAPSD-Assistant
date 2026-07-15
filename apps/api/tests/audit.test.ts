@@ -43,7 +43,8 @@ const mockDb: NodePgDatabase<typeof schema> = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(dbModule.getDb).mockReturnValue(mockDb);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(dbModule.getDb).mockReturnValue(mockDb as any);
   mockUserLimit.mockResolvedValue([
     { id: DEV_USER_ID, email: 'dev@local', name: 'Dev', role: 'viewer' },
   ]);
@@ -99,7 +100,8 @@ describe('sanitizeMetadata', () => {
         { id: 2, safe: true },
       ],
     };
-    const result = sanitizeMetadata(input);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = sanitizeMetadata(input) as any;
     expect(result.items[0]).not.toHaveProperty('token');
     expect(result.items[0]).toHaveProperty('id', 1);
     expect(result.items[1]).toHaveProperty('safe', true);

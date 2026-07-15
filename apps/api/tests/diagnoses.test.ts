@@ -58,7 +58,8 @@ function validBody() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(dbModule.getDb).mockReturnValue(mockDb);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(dbModule.getDb).mockReturnValue(mockDb as any);
   mockInsertValues.mockResolvedValue(undefined);
   mockUserLimit.mockResolvedValue([
     { id: DEV_USER_ID, email: 'dev@local', name: 'Dev', role: 'developer' },

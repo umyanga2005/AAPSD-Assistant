@@ -49,23 +49,12 @@ export default function Settings() {
     // Listen for the OAuth success message from the popup window
     const handleMessage = async (event: MessageEvent) => {
       // In production, you should verify event.origin here
-      if (event.data?.type === 'GITHUB_OAUTH_SUCCESS' && event.data?.token) {
-        try {
-          const response = await fetchWithAuth('http://localhost:3000/api/auth/github/save', {
-            method: 'POST',
-            body: JSON.stringify({ token: event.data.token }),
-          });
-
-          if (response.ok) {
-            setIntegrations((prev) =>
-              prev.map((i) => (i.provider === 'GitHub' ? { ...i, connected: true } : i)),
-            );
-          } else {
-            console.error('Failed to save GitHub token');
-          }
-        } catch (err) {
-          console.error('Error saving GitHub token:', err);
-        }
+      if (event.data?.type === 'GITHUB_OAUTH_SUCCESS') {
+        setIntegrations((prev) =>
+          prev.map((i) => (i.provider === 'GitHub' ? { ...i, connected: true } : i)),
+        );
+      } else if (event.data?.type === 'GITHUB_OAUTH_ERROR') {
+        console.error('GitHub OAuth failed:', event.data.error);
       }
     };
 
@@ -76,9 +65,20 @@ export default function Settings() {
     };
   }, []);
 
-  const handleConnectGitHub = () => {
-    // Open a popup window for GitHub OAuth
-    window.open('http://localhost:3000/api/auth/github', 'GitHub OAuth', 'width=600,height=600');
+  const handleConnectGitHub = async () => {
+    try {
+      const res = await fetchWithAuth('http://localhost:3000/api/auth/github/url');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          window.open(data.url, 'GitHub OAuth', 'width=600,height=600');
+        }
+      } else {
+        console.error('Failed to get GitHub OAuth URL');
+      }
+    } catch (err) {
+      console.error('Error starting GitHub OAuth', err);
+    }
   };
 
   const handleLogout = async () => {
