@@ -104,12 +104,24 @@ export class RealGitHubAdapter implements GitHubAdapter {
       }
     }
 
+    let runUrl = `https://github.com/${repo}/actions/runs/${runId}`;
+    let timestamp = new Date().toISOString();
+    try {
+      const runDetails = await this.request<{ html_url: string; created_at: string }>(`/repos/${repo}/actions/runs/${runId}`);
+      runUrl = runDetails.html_url;
+      timestamp = runDetails.created_at;
+    } catch {
+      // Ignore if we can't fetch run details
+    }
+
     return {
       source: 'github',
       logs: logs.map((log) => redactSecrets(log)),
       metadata: {
         repo,
         runId,
+        url: runUrl,
+        timestamp,
         totalJobs: jobs.length,
         failedJobs: failedJobs.map((j) => j.name),
       },

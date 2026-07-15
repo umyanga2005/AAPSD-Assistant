@@ -1,11 +1,20 @@
 import { getDb } from '../db/index.js';
-import { incidents } from '../db/schema.js';
+import { incidents, projects } from '../db/schema.js';
 
 async function seedIncidents() {
   const db = getDb();
+  
+  // Get a project to associate incidents with
+  const allProjects = await db.select().from(projects).limit(1);
+  if (allProjects.length === 0) {
+    console.error('No projects found to associate incidents with.');
+    process.exit(1);
+  }
+  const projectId = allProjects[0].id;
 
   const mockIncidents = [
     {
+      projectId,
       title: 'Database Connection Timeout',
       severity: 'critical' as const,
       status: 'resolved' as const,
@@ -14,6 +23,7 @@ async function seedIncidents() {
       impactedComponent: 'Primary Database',
     },
     {
+      projectId,
       title: 'High Latency in Payment Gateway API',
       severity: 'high' as const,
       status: 'investigating' as const,
@@ -22,6 +32,7 @@ async function seedIncidents() {
       impactedComponent: 'Payment Service',
     },
     {
+      projectId,
       title: 'Elevated CPU on Worker Nodes',
       severity: 'low' as const,
       status: 'active' as const,

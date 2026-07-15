@@ -50,8 +50,13 @@ interface DashboardState {
   metrics: {
     cpu: MetricData | null;
     memory: MetricData | null;
+    restarts: MetricData | null;
+    error_rate: MetricData | null;
+    latency: MetricData | null;
   };
 }
+
+import { auth } from '../firebase.js';
 
 export default function Dashboard() {
   const [state, setState] = useState<DashboardState | null>(null);
@@ -65,20 +70,22 @@ export default function Dashboard() {
     // When deploying or running locally, Vite proxy might be used, but for direct WS:
     const wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/ws/dashboard';
 
-    const connectWs = () => {
+    const connectWs = async () => {
       setWsStatus('connecting');
-      const ws = new WebSocket(wsUrl);
+      
+      let token = '';
+      if (auth.currentUser) {
+        token = await auth.currentUser.getIdToken();
+      }
+      
+      const ws = new WebSocket(`${wsUrl}?token=${token}`);
 
       ws.onopen = () => {
         setWsStatus('connected');
       };
 
-      ws.onmessage = async (event) => {
+      ws.onmessage = (event) => {
         try {
-          const [_infraRes, _pipeRes] = await Promise.all([
-            fetchWithAuth(`${apiUrl}/api/infrastructure`),
-            fetchWithAuth(`${apiUrl}/api/pipelines`),
-          ]);
           const message = JSON.parse(event.data);
           if (message.type === 'update') {
             setState(message.payload);
@@ -251,6 +258,33 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="glass-panel p-6 rounded-2xl border-brand-border text-center">
+          <h3 className="text-brand-muted text-sm font-semibold uppercase tracking-wider mb-3">
+            Pod Restarts
+          </h3>
+          <p className="text-white text-3xl font-bold">
+            {state?.metrics?.restarts?.values?.at(-1) !== undefined ? state.metrics.restarts.values.at(-1) : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+          </p>
+        </div>
+        <div className="glass-panel p-6 rounded-2xl border-brand-border text-center">
+          <h3 className="text-brand-muted text-sm font-semibold uppercase tracking-wider mb-3">
+            Error Rate
+          </h3>
+          <p className="text-white text-3xl font-bold">
+            {state?.metrics?.error_rate?.values?.at(-1) !== undefined ? `${state.metrics.error_rate.values.at(-1)?.toFixed(2)} req/s` : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+          </p>
+        </div>
+        <div className="glass-panel p-6 rounded-2xl border-brand-border text-center">
+          <h3 className="text-brand-muted text-sm font-semibold uppercase tracking-wider mb-3">
+            P99 Latency
+          </h3>
+          <p className="text-white text-3xl font-bold">
+            {state?.metrics?.latency?.values?.at(-1) !== undefined ? `${state.metrics.latency.values.at(-1)?.toFixed(2)}s` : <span className="text-brand-muted italic text-xl">Unavailable</span>}
+          </p>
+        </div>
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass-panel p-6 rounded-2xl border-brand-border h-[400px] flex flex-col">
@@ -259,8 +293,8 @@ export default function Dashboard() {
             {state?.metrics?.cpu ? (
               <Line data={cpuData} options={chartOptions} />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-brand-muted">
-                Not configured ( - )
+              <div className="absolute inset-0 flex items-center justify-center text-brand-muted italic">
+                Unavailable
               </div>
             )}
           </div>
@@ -271,8 +305,8 @@ export default function Dashboard() {
             {state?.metrics?.memory ? (
               <Line data={memoryData} options={chartOptions} />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-brand-muted">
-                Not configured ( - )
+              <div className="absolute inset-0 flex items-center justify-center text-brand-muted italic">
+                Unavailable
               </div>
             )}
           </div>

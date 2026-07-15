@@ -18,6 +18,7 @@ import {
   systemConnections,
 } from './db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
+import { decrypt } from './services/encryption.js';
 import authRoutes from './routes/auth.js';
 import { getAuditEventsByProject, recordAuditEvent, getAllAuditEvents } from './services/audit.js';
 import {
@@ -105,7 +106,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   const devAuthPreHandler = async (request: FastifyRequest, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization;
+    let authHeader = request.headers.authorization;
+    const queryToken = (request.query as Record<string, string | undefined>).token;
+    if (queryToken && !authHeader) {
+      authHeader = `Bearer ${queryToken}`;
+    }
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // Fallback to dev user header for local development bypass if no token
       if (('nodeEnv' in config ? config.nodeEnv : 'development') !== 'production') {
@@ -196,10 +202,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(authRoutes, { prefix: '/', devAuthPreHandler });
 
-  app.get<{ Querystring: { repo?: string; page?: string; limit?: string } }>(
+  app.get<{ Querystring: { project_id?: string; repo?: string; page?: string; limit?: string } }>(
     '/api/pipelines',
-    { preHandler: [devAuthPreHandler] },
-    async (request, _reply) => {
+    { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] },
+    async (request, reply) => {
       const user = (request as unknown as Record<string, unknown>).user as { id: string };
       const db = getDb();
       const integration = await db
@@ -212,9 +218,10 @@ export async function buildApp(): Promise<FastifyInstance> {
         return { data: [] }; // No GitHub integration connected
       }
 
+      const allowedRepos = 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [];
       const gh = new RealGitHubAdapter({
-        token: integration[0].accessToken,
-        allowedRepos: [], // Allow all for this user token
+        token: decrypt(integration[0].accessToken),
+        allowedRepos,
       });
 
       try {
@@ -222,13 +229,18 @@ export async function buildApp(): Promise<FastifyInstance> {
         let targetRepo = repo;
 
         if (!targetRepo) {
-          // If no repo specified, try to fetch the first repo the user has access to, or fallback
-          const repos = await gh.getUserRepos();
-          if (repos.length > 0) {
-            targetRepo = repos[0];
+          if (allowedRepos.length > 0) {
+            targetRepo = allowedRepos[0];
           } else {
-            return { data: [] };
+            const repos = await gh.getUserRepos();
+            if (repos.length > 0) {
+              targetRepo = repos[0];
+            } else {
+              return { data: [] };
+            }
           }
+        } else if (allowedRepos.length > 0 && !allowedRepos.includes(targetRepo)) {
+          return reply.status(403).send({ error: 'Repository not in allowed list' });
         }
 
         const pageNum = parseInt(page || '1', 10);
@@ -238,12 +250,12 @@ export async function buildApp(): Promise<FastifyInstance> {
         return { data: runs };
       } catch (err) {
         app.log.error(err);
-        return { data: [] }; // Fallback to empty if it fails (as requested)
+        return reply.status(502).send({ error: 'GitHub API request failed' });
       }
     },
   );
 
-  app.get('/api/github/repos', { preHandler: [devAuthPreHandler] }, async (request, _reply) => {
+  app.get<{ Querystring: { project_id?: string } }>('/api/github/repos', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
     const user = (request as unknown as Record<string, unknown>).user as { id: string };
     const db = getDb();
     const integration = await db
@@ -256,60 +268,102 @@ export async function buildApp(): Promise<FastifyInstance> {
       return { repos: [] };
     }
 
+    const allowedRepos = 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [];
     const gh = new RealGitHubAdapter({
-      token: integration[0].accessToken,
-      allowedRepos: [],
+      token: decrypt(integration[0].accessToken),
+      allowedRepos,
     });
 
     try {
+      if (allowedRepos.length > 0) {
+        return { repos: allowedRepos };
+      }
       const repos = await gh.getUserRepos();
       return { repos };
     } catch (err) {
       app.log.error(err);
-      return { repos: [] };
+      return reply.status(502).send({ error: 'GitHub API request failed' });
     }
   });
 
-  app.get('/api/infrastructure', { preHandler: [devAuthPreHandler] }, async () => {
+  app.get<{ Querystring: { project_id?: string } }>('/api/infrastructure', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
     const k8s = getK8sAdapter();
-    if (!k8s) return { deployments: [], pods: [] };
+    const prom = getPrometheusAdapter();
+    
+    if (!k8s) return reply.status(502).send({ error: 'Kubernetes adapter not configured' });
+    const allowedNamespaces = 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
+    const targetNs = allowedNamespaces.length > 0 ? allowedNamespaces[0] : 'default';
+    
     try {
       const [deployments, pods] = await Promise.all([
-        k8s.getDeployments('default'),
-        k8s.getPods('default'),
+        k8s.getDeployments(targetNs),
+        k8s.getPods(targetNs),
       ]);
-      return { deployments, pods };
-    } catch {
-      return { deployments: [], pods: [] }; // Fallback to empty if it fails
+
+      let metrics: Record<string, unknown> = {
+        cpu: null,
+        memory: null,
+        restarts: null,
+        error_rate: null,
+        latency: null,
+      };
+
+      if (prom) {
+        const [cpu, memory, restarts, error_rate, latency] = await Promise.all([
+          prom.query('cpu').catch(() => null),
+          prom.query('memory').catch(() => null),
+          prom.query('restarts').catch(() => null),
+          prom.query('error_rate').catch(() => null),
+          prom.query('latency').catch(() => null),
+        ]);
+        metrics = { cpu, memory, restarts, error_rate, latency };
+      }
+
+      return { deployments, pods, metrics };
+    } catch (err) {
+      app.log.error(err);
+      return reply.status(502).send({ error: 'Failed to fetch Kubernetes infrastructure data' });
     }
   });
 
-  app.get('/api/incidents', { preHandler: [devAuthPreHandler] }, async () => {
+  app.get<{ Querystring: { project_id?: string } }>('/api/incidents', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
     const db = getDb();
+    const { project_id } = request.query;
     try {
-      const data = await db.select().from(incidents).orderBy(desc(incidents.createdAt));
+      let data;
+      if (project_id) {
+        data = await db.select().from(incidents).where(eq(incidents.projectId, project_id)).orderBy(desc(incidents.createdAt));
+      } else {
+        data = await db.select().from(incidents).orderBy(desc(incidents.createdAt));
+      }
       return data;
     } catch (err) {
       app.log.error(err);
-      return [];
+      return reply.status(500).send({ error: 'Failed to fetch incidents' });
     }
   });
 
   app.post<{
+    Querystring: { project_id?: string };
     Body: {
+      projectId?: string;
       title: string;
       severity: string;
       status: string;
       description: string;
       impactedComponent: string;
     };
-  }>('/api/incidents', { preHandler: [devAuthPreHandler] }, async (request, reply) => {
+  }>('/api/incidents', { preHandler: [devAuthPreHandler, _requireProjectRole('viewer')] }, async (request, reply) => {
     const db = getDb();
     try {
       const { title, severity, status, description, impactedComponent } = request.body;
+      const projectId = request.body.projectId || request.query.project_id;
+      if (!projectId) return reply.status(400).send({ error: 'projectId is required' });
+
       const newIncident = await db
         .insert(incidents)
         .values({
+          projectId,
           title,
           severity,
           status,
@@ -324,13 +378,14 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  app.route({
+  app.route<{ Querystring: { project_id?: string; token?: string } }>({
     method: 'GET',
     url: '/api/ws/dashboard',
+    preHandler: [devAuthPreHandler, _requireProjectRole('viewer')],
     handler: (req, reply) => {
       reply.status(400).send({ error: 'WebSocket connection required' });
     },
-    wsHandler: (connection, _req) => {
+    wsHandler: (connection, req) => {
       const sendUpdates = async () => {
         try {
           const gh = getGitHubAdapter();
@@ -339,11 +394,16 @@ export async function buildApp(): Promise<FastifyInstance> {
 
           const pipelines: { data: unknown[] } = { data: [] };
           if (gh) {
-            const repo =
-              !('_errors' in config) && config.gitHubAllowedRepos[0]
-                ? config.gitHubAllowedRepos[0]
-                : 'umyanga2005/AAPSD-Assistant';
-            pipelines.data = await gh.getWorkflowRuns(repo, 10).catch(() => []);
+            const allowedRepos = 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [];
+            const targetRepo = allowedRepos.length > 0 ? allowedRepos[0] : null;
+            if (targetRepo) {
+              pipelines.data = await gh.getWorkflowRuns(targetRepo, 10).catch(() => []);
+            } else {
+              const repos = await gh.getUserRepos().catch(() => []);
+              if (repos.length > 0) {
+                pipelines.data = await gh.getWorkflowRuns(repos[0], 10).catch(() => []);
+              }
+            }
           }
 
           let infrastructure: { deployments: unknown[]; pods: unknown[] } = {
@@ -351,20 +411,31 @@ export async function buildApp(): Promise<FastifyInstance> {
             pods: [],
           };
           if (k8s) {
+            const allowedNamespaces = 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [];
+            const targetNs = allowedNamespaces.length > 0 ? allowedNamespaces[0] : 'default';
             const [deployments, pods] = await Promise.all([
-              k8s.getDeployments('default').catch(() => []),
-              k8s.getPods('default').catch(() => []),
+              k8s.getDeployments(targetNs).catch(() => []),
+              k8s.getPods(targetNs).catch(() => []),
             ]);
             infrastructure = { deployments, pods };
           }
 
-          let metrics: { cpu: unknown; memory: unknown } = { cpu: null, memory: null };
+          let metrics: Record<string, unknown> = {
+            cpu: null,
+            memory: null,
+            restarts: null,
+            error_rate: null,
+            latency: null,
+          };
           if (prom) {
-            const [cpu, memory] = await Promise.all([
+            const [cpu, memory, restarts, error_rate, latency] = await Promise.all([
               prom.query('cpu').catch(() => null),
               prom.query('memory').catch(() => null),
+              prom.query('restarts').catch(() => null),
+              prom.query('error_rate').catch(() => null),
+              prom.query('latency').catch(() => null),
             ]);
-            metrics = { cpu, memory };
+            metrics = { cpu, memory, restarts, error_rate, latency };
           }
 
           connection.send(

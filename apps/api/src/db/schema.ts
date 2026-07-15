@@ -189,6 +189,9 @@ export const incidents = pgTable(
   'incidents',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
     title: varchar('title', { length: 255 }).notNull(),
     severity: varchar('severity', { length: 20 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
@@ -201,6 +204,7 @@ export const incidents = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => ({
+    incidentProjectIdx: index('idx_incidents_project_id').on(table.projectId),
     incidentStatusIdx: index('idx_incidents_status').on(table.status),
     incidentSeverityIdx: index('idx_incidents_severity').on(table.severity),
   }),

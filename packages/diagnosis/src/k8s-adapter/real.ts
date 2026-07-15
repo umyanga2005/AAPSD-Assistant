@@ -119,6 +119,7 @@ export class RealK8sAdapter implements K8sAdapter {
           restartCount: c.restartCount,
           state: c.state,
         })),
+        timestamp: pod.createdAt,
         podEvents: events.length,
         deployments: deployments.length,
       },

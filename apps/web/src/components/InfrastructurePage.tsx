@@ -32,9 +32,23 @@ interface PodInfo {
   createdAt?: string;
 }
 
+interface MetricData {
+  queryName: string;
+  timestamps: string[];
+  values: number[];
+  description: string;
+}
+
 interface InfrastructureData {
   deployments: Deployment[];
   pods: PodInfo[];
+  metrics?: {
+    cpu: MetricData | null;
+    memory: MetricData | null;
+    restarts: MetricData | null;
+    error_rate: MetricData | null;
+    latency: MetricData | null;
+  };
 }
 
 type ViewState = 'loading' | 'success' | 'error';
@@ -217,6 +231,18 @@ export default function InfrastructurePage() {
                   {data.pods.map((pod) => {
                     const restarts =
                       pod.containers?.reduce((cSum, c) => cSum + (c.restartCount || 0), 0) || 0;
+                    
+                    // Simple mock mapping to distribute the metric across pods if real metric exists,
+                    // but usually prometheus metrics are cluster/node wide unless filtered by pod name.
+                    // For the scope of this dashboard, we just show cluster metrics, or 'Unavailable' 
+                    // on the pod row if we can't map it.
+                    
+                    const cpuMetric = data.metrics?.cpu?.values?.at(-1);
+                    const memoryMetric = data.metrics?.memory?.values?.at(-1);
+
+                    const displayCpu = cpuMetric !== undefined ? `${cpuMetric.toFixed(2)} cores` : 'Unavailable';
+                    const displayMem = memoryMetric !== undefined ? `${(memoryMetric / 1024 / 1024).toFixed(0)} MB` : 'Unavailable';
+
                     return (
                       <tr
                         key={pod.name}
@@ -244,8 +270,8 @@ export default function InfrastructurePage() {
                             {restarts}
                           </span>
                         </td>
-                        <td className="p-4 text-brand-primary/50 text-xs italic">N/A</td>
-                        <td className="p-4 text-brand-primary/50 text-xs italic">N/A</td>
+                        <td className={`p-4 text-xs ${displayCpu === 'Unavailable' ? 'text-brand-primary/50 italic' : 'text-brand-primary'}`}>{displayCpu}</td>
+                        <td className={`p-4 text-xs ${displayMem === 'Unavailable' ? 'text-brand-primary/50 italic' : 'text-brand-primary'}`}>{displayMem}</td>
                       </tr>
                     );
                   })}

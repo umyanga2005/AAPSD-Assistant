@@ -1,6 +1,20 @@
-import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/index.js';
+import * as authService from '../src/services/auth.js';
+
+vi.mock('../src/services/auth.js', async () => {
+  const actual = await vi.importActual('../src/services/auth.js');
+  return {
+    ...actual,
+    resolveDevUser: vi.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'test@local',
+      name: 'Test',
+      role: 'admin'
+    }),
+  };
+});
 
 describe('API', () => {
   let app: FastifyInstance;
@@ -31,7 +45,12 @@ describe('API', () => {
 
   describe('GET /api/ws/dashboard', () => {
     it('accepts a WebSocket upgrade', async () => {
-      const socket = await app.injectWS('/api/ws/dashboard');
+      const socket = await app.injectWS('/api/ws/dashboard', {
+        headers: {
+          'x-dev-user-id': 'user-1',
+          'x-dev-role': 'admin', // Need a role to bypass the _requireProjectRole middleware for now if we test it without project
+        },
+      });
 
       expect(socket.readyState).toBe(1);
       socket.close();
