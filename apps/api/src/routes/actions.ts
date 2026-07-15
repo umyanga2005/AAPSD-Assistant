@@ -94,7 +94,8 @@ export const actionRoutes: FastifyPluginAsync = async (app) => {
         environmentName: env[0].name,
         userRole,
         actionType,
-        args: typedArgs,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        args: typedArgs as any,
       };
 
       const result = evaluator.evaluate(context);
