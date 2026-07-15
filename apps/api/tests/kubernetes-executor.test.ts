@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PolicyEvaluator } from '@aapsd/policy';
 import {
   executeKubernetesRestart,
+  executeKubernetesScale,
   MockKubernetesExecutorAdapter,
 } from '../src/services/kubernetes-executor.js';
 import Fastify from 'fastify';
@@ -229,5 +230,167 @@ describe('Integration Test: POST /action-plans/:id/execute (Kubernetes Restart)'
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.status).toBe('succeeded');
+  });
+});
+
+describe('Policy Test: Kubernetes Deployment Scale', () => {
+  it('allows scale for allowed namespace, deployment, and replicas', () => {
+    const evaluator = new PolicyEvaluator({
+      allowedRepos: [],
+      allowedWorkflows: [],
+      allowedNamespaces: ['staging-ns'],
+      allowedDeployments: ['api-service'],
+      minScale: 1,
+      maxScale: 5,
+    });
+
+    const result = evaluator.evaluate({
+      environmentName: 'staging',
+      userRole: 'developer',
+      actionType: 'kubernetes.deployment.scale',
+      args: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 3 },
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('rejects out-of-range scaling (too large)', () => {
+    const evaluator = new PolicyEvaluator({
+      allowedRepos: [],
+      allowedWorkflows: [],
+      allowedNamespaces: ['staging-ns'],
+      allowedDeployments: ['api-service'],
+      minScale: 1,
+      maxScale: 5,
+    });
+
+    const result = evaluator.evaluate({
+      environmentName: 'staging',
+      userRole: 'developer',
+      actionType: 'kubernetes.deployment.scale',
+      args: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 10 },
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('exceeds maximum');
+  });
+});
+
+describe('Executor Test: executeKubernetesScale', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('successfully executes an approved staging scale plan', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        projectId: 'proj-1',
+        environmentId: 'env-1',
+        actionType: 'kubernetes.deployment.scale',
+        status: 'approved',
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 3 },
+      },
+    ]);
+    mockDb.limit.mockResolvedValueOnce([{ name: 'staging' }]); // environment
+    mockDb.limit.mockResolvedValueOnce([{ role: 'devops_engineer' }]); // user role
+
+    const result = await executeKubernetesScale(
+      'plan-scale',
+      'user-1',
+      new MockKubernetesExecutorAdapter(),
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(audit.recordAuditEvent).toHaveBeenCalledTimes(3); // QUEUED, RUNNING, SUCCEEDED
+  });
+
+  it('is idempotent if already at desired scale', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        projectId: 'proj-1',
+        environmentId: 'env-1',
+        actionType: 'kubernetes.deployment.scale',
+        status: 'approved',
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 3 },
+      },
+    ]);
+    mockDb.limit.mockResolvedValueOnce([{ name: 'staging' }]); // environment
+    mockDb.limit.mockResolvedValueOnce([{ role: 'devops_engineer' }]); // user role
+
+    const adapter = new MockKubernetesExecutorAdapter();
+    adapter.readDeploymentScale = vi.fn().mockResolvedValue(3);
+
+    const result = await executeKubernetesScale('plan-scale', 'user-1', adapter);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.message).toContain('already at target scale');
+  });
+
+  it('rejects execution if plan is missing approval (pending)', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        status: 'pending',
+      },
+    ]);
+
+    await expect(executeKubernetesScale('plan-scale', 'user-1')).rejects.toThrow(
+      'Plan is not approved',
+    );
+  });
+
+  it('rejects execution for expired approval', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        status: 'approved',
+        expiresAt: new Date(Date.now() - 10000).toISOString(),
+      },
+    ]);
+
+    await expect(executeKubernetesScale('plan-scale', 'user-1')).rejects.toThrow(
+      'Plan has expired',
+    );
+  });
+
+  it('rejects execution for production access', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        projectId: 'proj-1',
+        environmentId: 'env-1',
+        actionType: 'kubernetes.deployment.scale',
+        status: 'approved',
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 3 },
+      },
+    ]);
+    mockDb.limit.mockResolvedValueOnce([{ name: 'production' }]); // environment
+
+    await expect(executeKubernetesScale('plan-scale', 'user-1')).rejects.toThrow(
+      'Execution is only permitted in the staging environment',
+    );
+  });
+
+  it('handles verification timeout', async () => {
+    mockDb.limit.mockResolvedValueOnce([
+      {
+        id: 'plan-scale',
+        projectId: 'proj-1',
+        environmentId: 'env-1',
+        actionType: 'kubernetes.deployment.scale',
+        status: 'approved',
+        typedArgs: { namespace: 'staging-ns', deploymentName: 'api-service', replicas: 3 },
+      },
+    ]);
+    mockDb.limit.mockResolvedValueOnce([{ name: 'staging' }]); // environment
+    mockDb.limit.mockResolvedValueOnce([{ role: 'devops_engineer' }]); // user role
+
+    const adapter = new MockKubernetesExecutorAdapter();
+    adapter.pollRolloutStatus = vi.fn().mockResolvedValue('timed_out');
+
+    const result = await executeKubernetesScale('plan-scale', 'user-1', adapter);
+
+    expect(result.status).toBe('timed_out');
+    expect(audit.recordAuditEvent).toHaveBeenCalledTimes(3); // QUEUED, RUNNING, TIMED_OUT
   });
 });

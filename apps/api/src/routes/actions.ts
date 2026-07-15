@@ -13,7 +13,10 @@ import {
   recordAuditEvent,
 } from '../services/audit.js';
 import { executeGitHubWorkflow } from '../services/github-executor.js';
-import { executeKubernetesRestart } from '../services/kubernetes-executor.js';
+import {
+  executeKubernetesRestart,
+  executeKubernetesScale,
+} from '../services/kubernetes-executor.js';
 
 export const actionRoutes: FastifyPluginAsync = async (app) => {
   const configResult = getConfigSafe();
@@ -343,6 +346,8 @@ export const actionRoutes: FastifyPluginAsync = async (app) => {
           result = await executeGitHubWorkflow(request.params.id, user.id);
         } else if (plan[0].actionType === 'kubernetes.deployment.restart') {
           result = await executeKubernetesRestart(request.params.id, user.id);
+        } else if (plan[0].actionType === 'kubernetes.deployment.scale') {
+          result = await executeKubernetesScale(request.params.id, user.id);
         } else {
           return reply.status(400).send({ error: 'Unsupported action type for execution' });
         }
