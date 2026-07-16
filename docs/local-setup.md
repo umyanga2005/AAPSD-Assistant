@@ -5,6 +5,20 @@ This document outlines how to run a complete local instance of the AAPSD-Assista
 ## Prerequisites
 
 - Docker and Docker Compose installed.
+- (Optional) Minikube installed for local Kubernetes integration testing.
+
+### Installing Minikube (Windows)
+
+If you want to test Kubernetes integrations (Assistant and Governed Actions) locally without Docker Desktop's built-in Kubernetes:
+
+1. Open PowerShell as Administrator and run: `winget install minikube`
+2. Restart your terminal.
+3. Start Minikube: `minikube start`
+4. Run the helper script to generate the required `.env` credentials:
+   ```powershell
+   .\scripts\setup-minikube.ps1
+   ```
+5. Copy the generated `K8S_API_SERVER_URL` and `K8S_TOKEN` into your `apps/api/.env` file.
 
 ## 1. Setup
 

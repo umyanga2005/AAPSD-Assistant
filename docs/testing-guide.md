@@ -49,11 +49,12 @@ Designed for low-memory environments (e.g., 8GB laptops) without Docker or Kuber
 
 ### B. Staging-Remote (Hybrid)
 
-Designed for connecting a local UI/API to real cloud infrastructure (e.g., remote Redis, remote Kubernetes).
+Designed for connecting a local UI/API to real cloud infrastructure (e.g., remote Redis, remote Kubernetes or a local Minikube cluster).
 
 1. Copy standard `.env.example` to `.env`.
 2. Set `DEPLOYMENT_PROFILE=staging-remote`.
 3. Provide real external credentials (`REDIS_URL`, `K8S_TOKEN`, etc.).
+   _Note: If testing with Minikube locally, run `.\scripts\setup-minikube.ps1` to automatically generate your `K8S_TOKEN` and `K8S_API_SERVER_URL`._
 4. **Verification**:
    - Check the top header for the **Remote Staging** badge.
    - Ensure the job queue successfully connects to the remote Redis instance without crashing.
