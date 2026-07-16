@@ -47,7 +47,6 @@ import {
   RealPrometheusAdapter,
   setPrometheusAdapter,
   getPrometheusAdapter,
-  ALL_METRICS,
   type ModelProvider,
   RealDockerAdapter,
   setDockerAdapter,
@@ -55,6 +54,114 @@ import {
   setTerraformAdapter,
 } from '@aapsd/diagnosis';
 import type { Role, DevUser } from './services/auth.js';
+
+// Mock implementations that bypass complex interfaces
+const mockGitHubAdapter = {
+  getUserRepos: async () => [],
+  getRepoWorkflows: async () => [],
+  getWorkflowRuns: async () => [],
+  getWorkflowRunJobs: async () => [],
+  getJobSteps: async () => [],
+  getJobs: async () => [],
+  getJobLogs: async () => '',
+  dispatchWorkflow: async () => {
+    throw new Error('Disabled in local-lite');
+  },
+  collectEvidence: async () => ({
+    source: 'github',
+    summary: 'mock',
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    metadata: {},
+    logs: [],
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
+
+const mockK8sAdapter = {
+  getNamespaces: async () => [],
+  getDeployments: async () => [],
+  getPods: async () => [],
+  getPodLogs: async () => '',
+  getEvents: async () => [],
+  getPodStatus: async () => null,
+  restartDeployment: async () => {
+    throw new Error('Disabled in local-lite');
+  },
+  scaleDeployment: async () => {
+    throw new Error('Disabled in local-lite');
+  },
+  collectEvidence: async () => ({
+    source: 'kubernetes',
+    summary: 'mock',
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    metadata: {},
+    logs: [],
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
+
+const mockPrometheusAdapter = {
+  queryMetric: async () => [],
+  query: async () => [],
+  queryAll: async () => [],
+  checkHealth: async () => true,
+  collectEvidence: async () => ({
+    source: 'prometheus',
+    summary: 'mock',
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    metadata: {},
+    logs: [],
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
+
+const mockDockerAdapter = {
+  listImages: async () => [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getImageMetadata: async () => ({}) as any,
+  searchRegistries: async () => [],
+  checkVulnerabilities: async () => [],
+  getBuildLogs: async () => '',
+  runCommand: async () => '',
+  buildImage: async () => {},
+  checkHealth: async () => true,
+  collectEvidence: async () => ({
+    source: 'docker',
+    summary: 'mock',
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    metadata: {},
+    logs: [],
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
+
+const mockTerraformAdapter = {
+  listWorkspaces: async () => [],
+  getWorkspaceSummary: async () => null,
+  getWorkspaceState: async () => ({ resources: [] }),
+  getPlan: async () => null,
+  getPlanLogs: async () => '',
+  applyPlan: async () => {
+    throw new Error('Disabled');
+  },
+  destroyResources: async () => {
+    throw new Error('Disabled');
+  },
+  checkHealth: async () => true,
+  collectEvidence: async () => ({
+    source: 'terraform',
+    summary: 'mock',
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    metadata: {},
+    logs: [],
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
 
 function createModelProvider(): ModelProvider {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -104,38 +211,41 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Always use real adapters, providing dummy config if missing to prevent startup crash
   // Actual API calls will fail gracefully in the route handlers
-  const ghAdapter = new RealGitHubAdapter({
-    token: ('gitHubToken' in config ? config.gitHubToken : '') || 'dummy_token',
-    allowedRepos: 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [],
-  });
+  let ghAdapter, k8sAdapter, promAdapter, dockerAdapter, terraformAdapter;
+
+  if (!('_errors' in config) && config.deploymentProfile === 'local-lite') {
+    ghAdapter = mockGitHubAdapter;
+    k8sAdapter = mockK8sAdapter;
+    promAdapter = mockPrometheusAdapter;
+    dockerAdapter = mockDockerAdapter;
+    terraformAdapter = mockTerraformAdapter;
+  } else {
+    ghAdapter = new RealGitHubAdapter({
+      token: ('gitHubToken' in config ? config.gitHubToken : '') || 'dummy_token',
+      allowedRepos: 'gitHubAllowedRepos' in config ? config.gitHubAllowedRepos : [],
+    });
+    k8sAdapter = new RealK8sAdapter({
+      token: ('k8sToken' in config ? config.k8sToken : '') || 'dummy_token',
+      apiServerUrl: ('k8sApiServerUrl' in config ? config.k8sApiServerUrl : '') || 'https://dummy',
+      allowedNamespaces: 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [],
+    });
+    promAdapter = new RealPrometheusAdapter({
+      baseUrl: ('prometheusBaseUrl' in config ? config.prometheusBaseUrl : '') || 'http://dummy',
+      allowedMetrics: 'prometheusAllowedMetrics' in config ? config.prometheusAllowedMetrics : [],
+    });
+    dockerAdapter = new RealDockerAdapter(
+      ('dockerDaemonUrl' in config ? config.dockerDaemonUrl : '') || 'http://dummy',
+    );
+    terraformAdapter = new RealTerraformAdapter(
+      ('terraformApiUrl' in config ? config.terraformApiUrl : '') || 'http://dummy',
+      ('terraformToken' in config ? config.terraformToken : '') || 'dummy',
+    );
+  }
+
   setGitHubAdapter(ghAdapter);
-
-  const k8sAdapter = new RealK8sAdapter({
-    token: ('k8sToken' in config ? config.k8sToken : '') || 'dummy_token',
-    apiServerUrl: ('k8sApiServerUrl' in config ? config.k8sApiServerUrl : '') || 'http://localhost',
-    allowedNamespaces: 'k8sAllowedNamespaces' in config ? config.k8sAllowedNamespaces : [],
-  });
   setK8sAdapter(k8sAdapter);
-
-  const promAdapter = new RealPrometheusAdapter({
-    baseUrl: ('prometheusBaseUrl' in config ? config.prometheusBaseUrl : '') || 'http://localhost',
-    allowedMetrics:
-      'prometheusAllowedMetrics' in config && config.prometheusAllowedMetrics.length > 0
-        ? config.prometheusAllowedMetrics
-        : ALL_METRICS,
-  });
   setPrometheusAdapter(promAdapter);
-
-  const dockerAdapter = new RealDockerAdapter(
-    ('dockerDaemonUrl' in config ? config.dockerDaemonUrl : '') || 'http://localhost/v1.41',
-  );
   setDockerAdapter(dockerAdapter);
-
-  const terraformAdapter = new RealTerraformAdapter(
-    ('terraformApiUrl' in config ? config.terraformApiUrl : '') ||
-      'https://app.terraform.io/api/v2',
-    ('terraformToken' in config ? config.terraformToken : '') || 'dummy_tf_token',
-  );
   setTerraformAdapter(terraformAdapter);
 
   const app = Fastify({
@@ -315,6 +425,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get('/metrics', async (request, reply) => {
     reply.header('Content-Type', client.register.contentType);
     return client.register.metrics();
+  });
+
+  app.get('/api/v1/config', async (request, reply) => {
+    return reply.send({
+      deploymentProfile: '_errors' in config ? 'local-lite' : config.deploymentProfile,
+    });
   });
 
   app.get('/api/v1/health', async (request, reply) => {

@@ -1,10 +1,30 @@
+import { useState, useEffect } from 'react';
 import HealthStatus from './HealthStatus.js';
+import { getDeploymentProfile } from '../api.js';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
+  const [profile, setProfile] = useState<string>('local-lite');
+
+  useEffect(() => {
+    getDeploymentProfile().then(setProfile);
+  }, []);
+
+  const badgeLabels: Record<string, string> = {
+    'local-lite': 'Local Lite Simulation',
+    'staging-remote': 'Remote Staging',
+    'full-container': 'Full Container',
+  };
+
+  const badgeColors: Record<string, string> = {
+    'local-lite': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    'staging-remote': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    'full-container': 'bg-green-500/20 text-green-400 border-green-500/30',
+  };
+
   return (
     <header className="glass-header h-16 flex items-center justify-between px-4 lg:px-8 z-30 sticky top-0">
       <div className="flex items-center gap-4">
@@ -33,6 +53,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-6">
+        <div
+          className={`hidden md:flex px-3 py-1 rounded-full border text-xs font-semibold ${badgeColors[profile] || badgeColors['local-lite']}`}
+        >
+          {badgeLabels[profile] || badgeLabels['local-lite']}
+        </div>
         <HealthStatus />
         <div className="h-8 w-8 rounded-full bg-brand-surfaceHover border border-brand-border flex items-center justify-center">
           <span className="text-brand-muted text-sm">US</span>

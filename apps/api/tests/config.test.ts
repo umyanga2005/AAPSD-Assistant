@@ -60,11 +60,13 @@ describe('getConfig', () => {
     });
 
     it('throws ConfigError when REDIS_URL is missing', () => {
+      process.env.DEPLOYMENT_PROFILE = 'staging-remote';
       process.env.DATABASE_URL = 'postgresql://u:p@localhost:5432/db';
       expect(() => getConfig()).toThrow(ConfigError);
     });
 
     it('lists all missing errors in a single message', () => {
+      process.env.DEPLOYMENT_PROFILE = 'staging-remote';
       try {
         getConfig();
       } catch (err) {

@@ -341,6 +341,19 @@ export const actionRoutes: FastifyPluginAsync = async (app) => {
           return reply.status(400).send({ error: 'Plan is not in approved state' });
         }
 
+        if (!('_errors' in configResult) && configResult.deploymentProfile === 'local-lite') {
+          await recordAuditEvent({
+            actorId: user.id,
+            projectId: plan[0].projectId,
+            eventType: AUDIT_ACTION_PLAN_DENIED,
+            traceId: request.id,
+            targetType: 'actionPlan',
+            targetId: plan[0].id,
+            metadata: { reason: 'Mutable actions are disabled in local-lite profile' },
+          });
+          return reply.status(403).send({ error: 'Mutable actions disabled in local-lite mode' });
+        }
+
         // Idempotency key is the plan ID itself for this task context
         const idempotencyKey = plan[0].id;
 

@@ -21,3 +21,15 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
     headers,
   });
 }
+
+export async function getDeploymentProfile(): Promise<string> {
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/v1/config`);
+    if (!res.ok) return 'local-lite';
+    const data = await res.json();
+    return data.deploymentProfile || 'local-lite';
+  } catch (err) {
+    return 'local-lite';
+  }
+}

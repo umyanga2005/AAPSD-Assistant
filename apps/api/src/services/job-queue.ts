@@ -3,10 +3,15 @@ import IORedis from 'ioredis';
 import { executeGitHubWorkflow } from './github-executor.js';
 import { executeKubernetesRestart, executeKubernetesScale } from './kubernetes-executor.js';
 import { apiExecutorJobsTotal, apiQueueDepthTotal } from '../index.js';
+import { getConfigSafe } from '../config.js';
 
 let connection: IORedis | undefined;
 let executionQueue: Queue | undefined;
 let worker: Worker | undefined;
+
+let isLocalLite = false;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const inMemoryJobs = new Map<string, any>();
 
 export interface ExecutorJobData {
   planId: string;
@@ -16,6 +21,13 @@ export interface ExecutorJobData {
 }
 
 export function initQueue(redisUrl: string) {
+  const config = getConfigSafe();
+  if (!('_errors' in config) && config.deploymentProfile === 'local-lite') {
+    isLocalLite = true;
+    console.log('Using in-memory development queue for local-lite profile');
+    return;
+  }
+
   if (connection) return;
   connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 
@@ -93,6 +105,40 @@ export async function enqueueActionExecution(
   actionType: string,
   idempotencyKey: string,
 ): Promise<string> {
+  if (isLocalLite) {
+    const jobId = idempotencyKey;
+    inMemoryJobs.set(jobId, { id: jobId, state: 'waiting', attemptsMade: 0 });
+
+    // Process asynchronously
+    setTimeout(async () => {
+      const job = inMemoryJobs.get(jobId);
+      if (!job) return;
+      job.state = 'active';
+      try {
+        let executionPromise;
+        if (actionType === 'github.workflow.dispatch') {
+          executionPromise = executeGitHubWorkflow(planId, userId);
+        } else if (actionType === 'kubernetes.deployment.restart') {
+          executionPromise = executeKubernetesRestart(planId, userId);
+        } else if (actionType === 'kubernetes.deployment.scale') {
+          executionPromise = executeKubernetesScale(planId, userId);
+        } else {
+          throw new Error('Unsupported action type for execution');
+        }
+        const result = await executionPromise;
+        job.state = 'completed';
+        job.returnvalue = result;
+        apiExecutorJobsTotal.inc({ status: 'success' });
+      } catch (error: unknown) {
+        const err = error as Error;
+        job.state = 'failed';
+        job.failedReason = err.message;
+        apiExecutorJobsTotal.inc({ status: 'failed' });
+      }
+    }, 0);
+    return jobId;
+  }
+
   if (!executionQueue) throw new Error('Queue not initialized');
 
   const job = await executionQueue.add(
@@ -105,6 +151,19 @@ export async function enqueueActionExecution(
 }
 
 export async function getJobStatus(jobId: string) {
+  if (isLocalLite) {
+    const job = inMemoryJobs.get(jobId);
+    if (!job) return null;
+
+    let count = 0;
+    for (const j of inMemoryJobs.values()) {
+      if (j.state === 'waiting') count++;
+    }
+    apiQueueDepthTotal.set(count);
+
+    return job;
+  }
+
   if (!executionQueue) throw new Error('Queue not initialized');
   const job = await executionQueue.getJob(jobId);
   if (!job) return null;

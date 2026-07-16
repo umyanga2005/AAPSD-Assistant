@@ -1,4 +1,5 @@
 export interface AppConfig {
+  deploymentProfile: 'local-lite' | 'staging-remote' | 'full-container';
   port: number;
   databaseUrl: string;
   redisUrl: string;
@@ -46,14 +47,25 @@ export function getConfig(): AppConfig {
     errors.push(`PORT must be a positive integer, got "${portRaw}"`);
   }
 
+  const profileRaw = process.env.DEPLOYMENT_PROFILE ?? 'local-lite';
+  const deploymentProfile = ['local-lite', 'staging-remote', 'full-container'].includes(profileRaw)
+    ? (profileRaw as AppConfig['deploymentProfile'])
+    : 'local-lite';
+
+  if (!['local-lite', 'staging-remote', 'full-container'].includes(profileRaw)) {
+    errors.push(
+      `DEPLOYMENT_PROFILE must be one of: local-lite, staging-remote, full-container. Got "${profileRaw}"`,
+    );
+  }
+
   const databaseUrl = process.env.DATABASE_URL ?? '';
   if (!databaseUrl) {
     errors.push('DATABASE_URL is required but was not set');
   }
 
   const redisUrl = process.env.REDIS_URL ?? '';
-  if (!redisUrl) {
-    errors.push('REDIS_URL is required but was not set');
+  if (!redisUrl && deploymentProfile !== 'local-lite') {
+    errors.push(`REDIS_URL is required for profile "${deploymentProfile}"`);
   }
 
   const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -124,6 +136,7 @@ export function getConfig(): AppConfig {
   }
 
   return {
+    deploymentProfile,
     port: portRaw ? port : 3000,
     databaseUrl,
     redisUrl,
