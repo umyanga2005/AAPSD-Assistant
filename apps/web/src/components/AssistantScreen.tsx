@@ -51,8 +51,8 @@ export default function AssistantScreen() {
   const devUserId = import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-0000-0000-000000000001';
   const devRole = import.meta.env.VITE_DEV_ROLE ?? 'viewer';
   const devProjectId =
-    import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000002';
-  const devEnvId = import.meta.env.VITE_DEV_ENV_ID ?? '00000000-0000-0000-0000-000000000003';
+    import.meta.env.VITE_DEV_PROJECT_ID ?? '00000000-0000-0000-0000-000000000001';
+  const devEnvId = import.meta.env.VITE_DEV_ENV_ID ?? '00000000-0000-0000-0000-000000000001';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

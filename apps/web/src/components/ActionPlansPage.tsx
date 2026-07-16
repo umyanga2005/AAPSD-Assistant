@@ -19,7 +19,7 @@ interface ActionPlan {
 // removed unused AuditEvent
 
 const DEFAULT_PROJECT_ID = '00000000-0000-0000-0000-000000000001';
-const DEFAULT_ENV_ID = '00000000-0000-0000-0000-000000000002'; // staging
+const DEFAULT_ENV_ID = '00000000-0000-0000-0000-000000000001'; // staging
 
 function formatDate(iso: string): string {
   if (!iso) return 'N/A';
