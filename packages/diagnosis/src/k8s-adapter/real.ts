@@ -27,8 +27,9 @@ export class RealK8sAdapter implements K8sAdapter {
     this.token = config.token;
     this.apiServerUrl = config.apiServerUrl ?? 'https://kubernetes.default.svc';
     this.allowedNamespaces = config.allowedNamespaces ?? [];
+    const skipTls = process.env.K8S_SKIP_TLS_VERIFY === 'true';
     const connectOptions: { rejectUnauthorized?: boolean; ca?: string } = {
-      rejectUnauthorized: true,
+      rejectUnauthorized: !skipTls,
     };
     if (config.caCert) {
       connectOptions.ca = config.caCert;
