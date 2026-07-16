@@ -324,69 +324,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* Recent Activity / Pipelines */}
-      <div className="glass-panel rounded-2xl border-brand-border overflow-hidden">
-        <div className="p-6 border-b border-brand-border/50 bg-brand-dark/50">
-          <h2 className="text-xl font-bold text-white">Recent Pipeline Runs</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-surfaceHover/50 text-brand-muted text-xs uppercase tracking-wider">
-                <th className="p-4 font-semibold">Workflow</th>
-                <th className="p-4 font-semibold">Status</th>
-                <th className="p-4 font-semibold">Branch</th>
-                <th className="p-4 font-semibold">Triggered At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-border/50 text-sm">
-              {(state?.pipelines?.data || []).slice(0, 5).map((run: PipelineRun) => (
-                <tr
-                  key={run.id || run.name}
-                  className="hover:bg-brand-surfaceHover/30 transition-colors"
-                >
-                  <td className="p-4 font-medium text-white">{run.name || run.workflowName}</td>
-                  <td className="p-4">
-                    <span
-                      className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border ${
-                        run.status === 'success' || run.status === 'completed'
-                          ? 'text-brand-success bg-brand-success/10 border-brand-success/30'
-                          : run.status === 'failed' || run.status === 'failure'
-                            ? 'text-brand-danger bg-brand-danger/10 border-brand-danger/30'
-                            : 'text-brand-primary bg-brand-primary/10 border-brand-primary/30 animate-pulse'
-                      }`}
-                    >
-                      {run.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-brand-muted flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                      />
-                    </svg>
-                    {run.branch || 'main'}
-                  </td>
-                  <td className="p-4 text-brand-muted">
-                    {run.createdAt ? new Date(run.createdAt).toLocaleString() : 'N/A'}
-                  </td>
-                </tr>
-              ))}
-              {(!state?.pipelines?.data || state.pipelines.data.length === 0) && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-brand-muted">
-                    No recent pipeline runs.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

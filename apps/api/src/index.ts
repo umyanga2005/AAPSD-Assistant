@@ -37,7 +37,7 @@ import { validateDiagnoseBody } from './services/validation.js';
 import {
   runDiagnosis,
   FakeModelProvider,
-  OpenRouterModelProvider,
+  GroqModelProvider,
   RealGitHubAdapter,
   setGitHubAdapter,
   getGitHubAdapter,
@@ -164,9 +164,9 @@ const mockTerraformAdapter = {
 } as any;
 
 function createModelProvider(): ModelProvider {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (apiKey) {
-    return new OpenRouterModelProvider({ apiKey });
+    return new GroqModelProvider({ apiKey });
   }
   return new FakeModelProvider();
 }

@@ -36,10 +36,9 @@ spec:
     app: prometheus
   ports:
     - protocol: TCP
-      port: 9090
+      port: 9095
       targetPort: 9090
-      nodePort: 30095
-  type: NodePort
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment

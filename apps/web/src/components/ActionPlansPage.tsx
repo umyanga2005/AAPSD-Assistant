@@ -117,7 +117,7 @@ export default function ActionPlansPage() {
     }
   };
 
-  const handleAction = async (planId: string, action: 'approve' | 'reject') => {
+  const handleAction = async (planId: string, action: 'approve' | 'reject' | 'execute') => {
     setActioning(true);
     setError(null);
     try {
@@ -407,6 +407,26 @@ export default function ActionPlansPage() {
                       ></path>
                     </svg>
                     {actioning ? 'Processing...' : 'Reject Plan'}
+                  </button>
+                </div>
+              )}
+
+              {selectedPlan.status === 'approved' && (
+                <div className="border-t border-brand-border pt-6 flex gap-4">
+                  <button
+                    className="flex-1 py-3 bg-brand-primary/20 text-brand-primary border border-brand-primary/50 hover:bg-brand-primary/30 rounded font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+                    onClick={() => handleAction(selectedPlan.id, 'execute')}
+                    disabled={actioning}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      ></path>
+                    </svg>
+                    {actioning ? 'Executing...' : 'Execute Plan'}
                   </button>
                 </div>
               )}

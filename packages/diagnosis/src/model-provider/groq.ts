@@ -3,7 +3,7 @@ import type { ModelProvider } from './types.js';
 let globalTokenUsage = 0;
 const MAX_TOKEN_BUDGET = 500000; // 500k tokens max
 
-export class OpenRouterModelProvider implements ModelProvider {
+export class GroqModelProvider implements ModelProvider {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
@@ -35,6 +35,7 @@ export class OpenRouterModelProvider implements ModelProvider {
         },
         body: JSON.stringify({
           model: this.model,
+          response_format: { type: 'json_object' },
           messages: [{ role: 'user', content: prompt }],
         }),
         signal: controller.signal,
@@ -58,6 +59,7 @@ export class OpenRouterModelProvider implements ModelProvider {
         throw new Error('Groq response missing content in choice message');
       }
 
+      // Sometimes models wrap JSON in markdown even with response_format constraints
       let jsonString = content.trim();
       if (jsonString.startsWith('```json')) {
         jsonString = jsonString.slice(7);
@@ -67,12 +69,13 @@ export class OpenRouterModelProvider implements ModelProvider {
       if (jsonString.endsWith('```')) {
         jsonString = jsonString.slice(0, -3);
       }
-      return JSON.parse(jsonString.trim()) as unknown;
+      return JSON.parse(jsonString.trim());
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new Error('Groq request timed out');
       }
-      throw err;
+      if (err instanceof Error) throw err;
+      throw new Error(`Groq unexpected error: ${String(err)}`);
     } finally {
       clearTimeout(timeoutId);
     }

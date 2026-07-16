@@ -34,24 +34,8 @@ export async function runDiagnosis(
   const hasAnyContext = !!(context?.pipelineRunId || context?.podName || context?.timeRange);
 
   if (!hasAnyContext) {
-    return {
-      requestId: request.traceId,
-      summary:
-        'No context provided. To run a diagnosis, specify a pipeline run, pod name, or time range.',
-      evidence: [],
-      likely_causes: [],
-      recommendations: [
-        {
-          action: 'Provide diagnostic context',
-          details:
-            'Include pipeline_run_id, pod_name, or a time range to collect relevant evidence.',
-        },
-      ],
-      confidence: 'insufficient_evidence',
-      needs_human_review: false,
-      redacted: false,
-      traceId: request.traceId,
-    };
+    // We now allow general queries without context.
+    // The collector will just return empty or generic state if no specific pod/pipeline is given.
   }
 
   const collector = evidenceCollector ?? createDefaultEvidenceCollector();
@@ -71,24 +55,9 @@ export async function runDiagnosis(
     (e) => e.logs.length > 0 || Object.keys(e.metadata).length > 0,
   );
 
-  if (!hasUsableEvidence) {
-    return {
-      requestId: request.traceId,
-      summary: 'No usable evidence could be collected from the provided context.',
-      evidence: [],
-      likely_causes: [],
-      recommendations: [
-        {
-          action: 'Verify context values',
-          details:
-            'The provided pipeline run, pod name, or time range returned no data. Double-check values and try again.',
-        },
-      ],
-      confidence: 'insufficient_evidence',
-      needs_human_review: false,
-      redacted: false,
-      traceId: request.traceId,
-    };
+  if (!hasUsableEvidence && hasAnyContext) {
+    // If context was provided but no evidence found, we still allow the AI to answer
+    // using its general knowledge based on the query.
   }
 
   const redactedEvidence = evidenceList.map((e) => ({
@@ -146,7 +115,7 @@ function buildPrompt(
   runbook: unknown,
 ): string {
   const schema = {
-    summary: 'string (1-2 sentences)',
+    summary: 'string (detailed, multi-paragraph analysis and answer to the query)',
     evidence: [
       {
         source: 'string',
@@ -162,8 +131,9 @@ function buildPrompt(
     needs_human_review: 'boolean',
   };
 
-  return `You are a DevOps and infrastructure diagnosis AI.
-Analyze the following request and evidence, and return a JSON object matching this schema EXACTLY. Do not include any text outside the JSON object. Do not wrap it in markdown formatting like \`\`\`json.
+  return `You are a highly capable AI assistant that can analyze any problem and suggest best solutions. You cannot implement them directly, but you can provide detailed analysis and actionable steps.
+Answer the user's query comprehensively in the 'summary' field. You may or may not receive context/evidence. If evidence is provided, use it. If not, use your general knowledge.
+Return a JSON object matching this schema EXACTLY. Do not include any text outside the JSON object. Do not wrap it in markdown formatting like \`\`\`json.
 Schema:
 ${JSON.stringify(schema, null, 2)}
 
