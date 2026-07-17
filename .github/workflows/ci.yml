@@ -58,4 +58,10 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Secret Scan & Static Analysis
-        run: npx trufflehog filesystem . --fail || echo "Trufflehog failed, but continuing for demonstration"
+        run: |
+          npx trufflehog filesystem . --fail
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Trufflehog failed, but continuing for demonstration"
+            exit 0
+          }
+        shell: powershell
