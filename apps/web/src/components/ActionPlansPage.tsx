@@ -125,15 +125,19 @@ export default function ActionPlansPage() {
         method: 'POST',
       });
 
+      // Read the body exactly once
+      const data = await res.json();
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || `Failed to ${action}`);
+        throw new Error(data.error || `Failed to ${action}`);
       }
 
-      if (selectedPlan?.id === planId) {
-        const updated = await res.json();
-        setSelectedPlan(updated);
+      // For approve/reject the server returns the updated plan object.
+      // For execute the server returns { message, jobId } — reload instead.
+      if (action !== 'execute' && selectedPlan?.id === planId) {
+        setSelectedPlan(data as ActionPlan);
       }
+
       await loadPlans();
     } catch (err: unknown) {
       setError((err as Error).message);
