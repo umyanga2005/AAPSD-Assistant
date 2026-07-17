@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { FakeModelProvider, OpenRouterModelProvider } from '../src/model-provider/index.js';
+import { FakeModelProvider, GroqModelProvider } from '../src/model-provider/index.js';
 import { validateModelResponse } from '../src/analyzer.js';
 import { analyzeWithModel } from '../src/analyzer.js';
 import type { ModelProvider } from '../src/model-provider/types.js';
@@ -32,18 +32,16 @@ describe('FakeModelProvider', () => {
   });
 });
 
-describe('OpenRouterModelProvider', () => {
+describe('GroqModelProvider', () => {
   it('throws when no API key is configured', () => {
     const _key = process.env.GROQ_API_KEY;
     vi.stubEnv('GROQ_API_KEY', '');
-    expect(() => new OpenRouterModelProvider()).toThrow(
-      'GROQ_API_KEY environment variable is required',
-    );
+    expect(() => new GroqModelProvider()).toThrow('GROQ_API_KEY environment variable is required');
     vi.unstubAllEnvs();
   });
 
   it('accepts explicit options without env vars', () => {
-    const provider = new OpenRouterModelProvider({
+    const provider = new GroqModelProvider({
       apiKey: 'sk-test',
       model: 'test-model',
       timeoutMs: 5_000,

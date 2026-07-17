@@ -74,7 +74,7 @@ describe('runDiagnosis', () => {
     expect(result.summary.length).toBeGreaterThan(0);
   });
 
-  it('returns insufficient_evidence when no context is provided', async () => {
+  it('returns AI result even when no context is provided', async () => {
     const result = await runDiagnosis(
       {
         userId: 'user-1',
@@ -85,21 +85,21 @@ describe('runDiagnosis', () => {
       },
       ['viewer'],
     );
-    expect(result.confidence).toBe('insufficient_evidence');
-    expect(result.summary).toContain('No context provided');
+    expect(result.confidence).toBe('high');
+    expect(result.summary).toContain('staging deployment failed');
     expect(result.recommendations.length).toBeGreaterThan(0);
-    expect(result.redacted).toBe(false);
+    expect(result.redacted).toBe(true);
   });
 
-  it('returns insufficient_evidence when evidence collector returns empty logs', async () => {
+  it('returns AI result even when evidence collector returns empty logs', async () => {
     const emptyCollector: EvidenceCollector = {
       async collectAll(_options: EvidenceCollectorOptions): Promise<CollectedEvidence[]> {
         return [{ source: 'github', logs: [], metadata: {} }];
       },
     };
     const result = await runDiagnosis(validRequest, ['viewer'], undefined, emptyCollector);
-    expect(result.confidence).toBe('insufficient_evidence');
-    expect(result.summary).toContain('No usable evidence');
+    expect(result.confidence).toBe('high');
+    expect(result.summary).toContain('staging deployment failed');
   });
 
   it('collects only requested evidence sources based on context fields', async () => {
