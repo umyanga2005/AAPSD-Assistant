@@ -25,7 +25,7 @@
     "@fastify/websocket": "^11.3.0",
     "@sinclair/typebox": "^0.34.52",
     "bullmq": "^5.80.3",
-    "drizzle-orm": "^0.38.0",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.0.0",
     "firebase-admin": "^14.1.0",
     "ioredis": "^5.11.1",
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
-    "drizzle-kit": "^0.30.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.16.0",
     "vitest": "^2.0.0"
   }

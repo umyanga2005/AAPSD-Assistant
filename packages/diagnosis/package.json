@@ -21,7 +21,7 @@
   "dependencies": {
     "@aapsd/contracts": "*",
     "@aapsd/policy": "*",
-    "undici": "^6.19.2"
+    "undici": "^6.27.0"
   },
   "devDependencies": {
     "vitest": "^2.0.0"
