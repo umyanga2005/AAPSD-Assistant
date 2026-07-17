@@ -9,7 +9,7 @@ import AuditLogsPage from './components/AuditLogsPage.js';
 import IncidentsPage from './components/IncidentsPage.js';
 import Settings from './components/Settings.js';
 import Login from './components/Login.js';
-import ActionPlansPage from './components/ActionPlansPage.js';
+// import ActionPlansPage from './components/ActionPlansPage.js'; // TODO: re-enable once stable
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './firebase.js';
 import './App.css';
@@ -43,10 +43,10 @@ const PAGES: Record<string, { title: string; description: string }> = {
     title: 'Settings',
     description: 'Manage integrations and preferences.',
   },
-  actions: {
-    title: 'Governed Actions',
-    description: 'Safely request and approve operational action plans.',
-  },
+  // actions: { // TODO: re-enable Governed Actions once stable
+  //   title: 'Governed Actions',
+  //   description: 'Safely request and approve operational action plans.',
+  // },
 };
 
 const getInitialPage = () => {
@@ -132,8 +132,6 @@ export default function App() {
             <AuditLogsPage />
           ) : page === 'settings' ? (
             <Settings />
-          ) : page === 'actions' ? (
-            <ActionPlansPage />
           ) : (
             <div className="animate-fade-in glass-panel rounded-xl p-8 max-w-4xl mx-auto mt-8 border-brand-primary/20">
               <h1 className="text-3xl font-bold text-white mb-2">{current.title}</h1>

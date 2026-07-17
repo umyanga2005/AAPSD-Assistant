@@ -16,10 +16,31 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Clean node_modules (prevent EPERM on retry)
+        run: |
+          if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue }
+          Get-ChildItem -Path apps,packages -Recurse -Directory -Filter node_modules -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }
+        shell: pwsh
+
+      - name: Install Dependencies (with retry)
+        run: |
+          $maxRetries = 3
+          $attempt = 0
+          do {
+            $attempt++
+            Write-Host "npm install attempt $attempt of $maxRetries"
+            npm install --prefer-offline
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -lt $maxRetries) {
+              Write-Host "Install failed, retrying in 10s..."
+              Start-Sleep -Seconds 10
+            }
+          } while ($attempt -lt $maxRetries)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+        shell: pwsh
 
       - name: Build Project
         run: npm run build
