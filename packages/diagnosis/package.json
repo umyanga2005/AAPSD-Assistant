@@ -24,6 +24,6 @@
     "undici": "^6.27.0"
   },
   "devDependencies": {
-    "vitest": "^2.0.0"
+    "vitest": "^3.2.6"
   }
 }
