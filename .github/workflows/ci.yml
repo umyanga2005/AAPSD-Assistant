@@ -23,7 +23,7 @@ jobs:
         run: |
           if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue }
           Get-ChildItem -Path apps,packages -Recurse -Directory -Filter node_modules -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }
-        shell: pwsh
+        shell: powershell
 
       - name: Install Dependencies (with retry)
         run: |
@@ -40,7 +40,7 @@ jobs:
             }
           } while ($attempt -lt $maxRetries)
           if ($LASTEXITCODE -ne 0) { exit 1 }
-        shell: pwsh
+        shell: powershell
 
       - name: Build Project
         run: npm run build
